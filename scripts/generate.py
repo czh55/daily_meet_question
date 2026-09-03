@@ -429,6 +429,18 @@ def add_to_history(q: dict, date_str: str, force: bool = False):
     save_history(sorted(merged.values(), key=lambda x: x.get("date", "")))
 
 
+def _existing_history_item(date_str: str) -> Optional[dict]:
+    """只看 history.json 文件本身，不合并 archive 重建结果。"""
+    if not HISTORY_FILE.exists():
+        return None
+    with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+        file_history = json.load(f)
+    for item in file_history:
+        if item.get("date") == date_str:
+            return item
+    return None
+
+
 def generate_today(
     dry_run: bool = False,
     force_slug: str = None,
@@ -436,6 +448,28 @@ def generate_today(
     force: bool = False,
 ) -> bool:
     today_date = target_date or date.today().isoformat()
+
+    # 当天已有完整精讲则默认跳过（与 daily-prompt 异常表一致）；重做需 --force
+    if not force:
+        existing = _existing_history_item(today_date)
+        archive_path = ARCHIVE / f"{today_date}.html"
+        if existing and archive_path.exists():
+            existing_q = get_question(existing.get("slug", ""))
+            if existing_q and is_complete(existing_q):
+                if force_slug and force_slug != existing.get("slug"):
+                    print(
+                        f"今日 ({today_date}) 已有记录（{existing.get('slug')}）。"
+                        f"覆盖请加 --force"
+                    )
+                    return False
+                print(f"今日 ({today_date}) 已有记录，跳过")
+                print(f"题目：{existing_q['title']} (#{existing_q['id']})")
+                if dry_run:
+                    print("\n[Dry-run] 跳过文件写入")
+                    return True
+                generate_index_html(existing_q, target_date=today_date)
+                print(f"✓ 沿用已有精讲 docs/archive/{today_date}.html")
+                return True
 
     if force_slug:
         slug, source = force_slug, "manual"
