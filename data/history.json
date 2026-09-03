@@ -1,0 +1,8 @@
+[
+  {
+    "date": "2026-09-03",
+    "slug": "sql-window-vs-groupby",
+    "title": "窗口函数和 GROUP BY 有什么区别？各自适用什么场景？",
+    "category": "SQL"
+  }
+]

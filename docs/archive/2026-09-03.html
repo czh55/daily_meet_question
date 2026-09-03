@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>窗口函数和 GROUP BY 有什么区别？各自适用什么场景？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-09-03</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#1</span>
+                    <span class="problem-type tag-sql">SQL</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">窗口函数和 GROUP BY 有什么区别？各自适用什么场景？</h1>
+                <div class="topic-row"><span class="topic-chip">窗口函数</span><span class="topic-chip">聚合</span><span class="topic-chip">GROUP BY</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察候选人对「聚合会丢行」与「窗口保留行」这两种范式的本质理解，以及能否在业务场景里选对工具。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先给一句话对比：GROUP BY 折叠行；窗口函数在保留明细的前提下做计算。</li><li>说清语法结构：OVER(PARTITION BY … ORDER BY …) 与聚合函数的分工。</li><li>举 1–2 个业务例子（排名、累计、同组对比）。</li><li>补充常见窗口类型：排名、聚合窗口、偏移（LAG/LEAD）。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：GROUP BY 会把多行「折叠」成更少的组；窗口函数在「不丢行」的前提下，对每一行按窗口范围做计算。</p>
+<p>GROUP BY 适合「只要汇总结果」：例如每个城市的 GMV、每个用户的订单数。结果集行数通常远小于原表。</p>
+<p>窗口函数适合「既要明细又要上下文统计」：例如给每笔订单标上该用户的累计消费、同城排名、相对上一日的差值。语法核心是 <code>函数() OVER (PARTITION BY … ORDER BY … [ROWS/RANGE …])</code>。</p>
+<p>常见三类：<br>1. 排名：ROW_NUMBER / RANK / DENSE_RANK<br>2. 聚合窗口：SUM/AVG/COUNT() OVER(...)<br>3. 偏移：LAG / LEAD 做环比、漏斗前后步</p>
+<p>面试时可主动对比：若业务最终只要汇总，GROUP BY 更清晰且优化器更好推；若下游还要明细字段或需要「同组对比」，窗口函数更合适。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">不丢行</span><span class="keyword-chip">OVER</span><span class="keyword-chip">PARTITION BY</span><span class="keyword-chip">排名函数</span><span class="keyword-chip">LAG/LEAD</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：ROW_NUMBER、RANK、DENSE_RANK 的区别？</h4>
+            <div class="followup-answer"><p>ROW_NUMBER 严格唯一序号，并列也强制拆开；RANK 并列同名次并跳号（1,1,3）；DENSE_RANK 并列同名次但不跳号（1,1,2）。取 TopN 不重复用 ROW_NUMBER；要「并列并列算并列」用 RANK/DENSE_RANK。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：窗口函数能替代所有 GROUP BY 吗？</h4>
+            <div class="followup-answer"><p>不能优雅替代。窗口结果仍是明细粒度，若最终要一行一组，还得再 DISTINCT/再聚合，既难读又可能更慢。该折叠就折叠。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>把窗口函数当成 GROUP BY 用，忘了结果仍是一行一条明细</li><li>ORDER BY 写错导致累计/排名语义完全反了</li><li>PARTITION BY 漏字段，把全局排名当成组内排名</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">GROUP BY 折叠行；窗口函数在行上「挂」上下文统计。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
