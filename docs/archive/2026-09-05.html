@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL 索引是怎么工作的？你会如何设计合理的索引？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-09-05</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#3</span>
+                    <span class="problem-type tag-sql">SQL</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">SQL 索引是怎么工作的？你会如何设计合理的索引？</h1>
+                <div class="topic-row"><span class="topic-chip">索引</span><span class="topic-chip">B+树</span><span class="topic-chip">查询优化</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>从「会写 SQL」进阶到「懂为什么慢」。考察索引结构直觉、最左前缀、选择性与写放大权衡。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>结构：InnoDB 聚簇索引 + 二级索引，B+树有序、适合范围。</li><li>何时建：高频过滤/连接/排序字段，且选择性够高。</li><li>怎么建：联合索引顺序、覆盖索引、避免函数包裹列。</li><li>代价：写入变慢、占空间；过多索引适得其反。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>以 MySQL InnoDB 为例：数据按主键聚簇存放在 B+树叶子；二级索引叶子存「索引键 + 主键」，回表再取整行。</p>
+<p>索引加速的本质是：用有序结构快速定位，避免全表扫描。范围查询、排序、分组也可能受益。</p>
+<p>设计原则：<br>1. 先看慢查询：WHERE / JOIN / ORDER BY 高频字段<br>2. 选择性高的列更适合（区分度低如性别单独建索引价值小）<br>3. 联合索引遵循最左前缀：<code>(a,b,c)</code> 可支撑 a / a,b / a,b,c，难支撑只查 b<br>4. 能覆盖查询更好（覆盖索引避免回表）<br>5. 避免在索引列上套函数：<code>DATE(created_at)=…</code> 往往失效，改成范围条件</p>
+<p>代价：每次写入要维护索引；索引太多会拖慢写入且优化器选错。实践是「用 explain 验证 + 监控慢查询」迭代，而不是一次性狂建。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">B+树</span><span class="keyword-chip">最左前缀</span><span class="keyword-chip">选择性</span><span class="keyword-chip">覆盖索引</span><span class="keyword-chip">回表</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：什么是回表？如何减少？</h4>
+            <div class="followup-answer"><p>二级索引找到主键后再回聚簇索引取整行。减少办法：覆盖索引（查询列都在索引里）、或把高频查询改成只取索引列。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：索引一定会变快吗？</h4>
+            <div class="followup-answer"><p>不一定。结果集很大时优化器可能放弃索引；低选择性索引帮助有限；错误联合顺序等于没用。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>在低基数列上滥建单列索引</li><li>联合索引字段顺序拍脑袋</li><li>只看执行时间、不看 explain 的 type/rows/Extra</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">索引是空间与写入换查询；联合索引顺序比「建了没有」更重要。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
