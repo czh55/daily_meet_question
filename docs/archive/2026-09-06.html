@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INNER JOIN 和 LEFT JOIN 的区别？什么时候用哪种？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-09-06</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#4</span>
+                    <span class="problem-type tag-sql">SQL</span>
+                    <span class="problem-difficulty difficulty-easy">简单</span>
+                </div>
+                <h1 class="problem-title">INNER JOIN 和 LEFT JOIN 的区别？什么时候用哪种？</h1>
+                <div class="topic-row"><span class="topic-chip">JOIN</span><span class="topic-chip">多表关联</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>基础但极易在业务 SQL 里用错，导致「用户数对不上」。考察集合语义与空值意识。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>用集合语言：交集 vs 左表全保留。</li><li>说清右表无匹配时 LEFT 的 NULL 行为。</li><li>业务例子：下过单的用户 vs 全部用户及其订单。</li><li>提醒：WHERE 里过滤右表字段可能把 LEFT 变成 INNER。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>INNER JOIN：只保留两表都能匹配上的行（交集）。<br>LEFT JOIN：保留左表全部行；右表无匹配时右表字段为 NULL。</p>
+<p>例子：用户表 LEFT JOIN 订单表 → 得到「所有用户 + 其订单（可能没有）」；若改 INNER → 只剩「至少有一单的用户」。</p>
+<p>选用口诀：<br>- 只要「两端都存在」的关系 → INNER<br>- 要以某张表为主体做补全/排查缺失 → LEFT（主体放左边）</p>
+<p>进阶注意：<code>LEFT JOIN t ON ... WHERE t.id IS NOT NULL</code> 等价于 INNER；在 WHERE 里写 <code>t.col = 1</code> 也可能无意过滤掉未匹配行。过滤右表条件优先放 ON，或明确你是否要保留未匹配。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">交集</span><span class="keyword-chip">保留左表</span><span class="keyword-chip">NULL</span><span class="keyword-chip">ON vs WHERE</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：一对多 JOIN 后做 COUNT 为什么会翻倍？</h4>
+            <div class="followup-answer"><p>因为行被展开了。应先按主体去重再聚合，或 COUNT(DISTINCT 主体键)，或先聚合右表再 JOIN。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>LEFT JOIN 后又在 WHERE 过滤右表，语义变 INNER</li><li>一对多关联后直接 SUM/COUNT 导致重复计算</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">INNER 要两边都有；LEFT 以左表为主体，不怕右表缺失。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
