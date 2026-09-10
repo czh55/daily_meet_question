@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A/B 实验的基本原理是什么？如何判断实验是否显著？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-09-09</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#7</span>
+                    <span class="problem-type tag-ab">A/B实验</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">A/B 实验的基本原理是什么？如何判断实验是否显著？</h1>
+                <div class="topic-row"><span class="topic-chip">假设检验</span><span class="topic-chip">分流</span><span class="topic-chip">显著性</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>互联网数据岗高频。考察科学实验思维，而不是只背 p-value。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>原理：随机分流近似「唯一差别是策略」。</li><li>流程：假设 → 指标 → 样本量 → 分流 → 分析。</li><li>显著：在约定 α 下拒绝原假设；同时看效应量与业务意义。</li><li>风险：偷看、多重比较、分流不均、新奇效应。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>原理：把用户随机分到对照/实验组，使两组在期望上协变量平衡，从而把指标差异主要归因于策略差异。</p>
+<p>标准流程：<br>1. 明确假设与核心指标 + 护栏指标<br>2. 估算样本量（基线、MDE、α、功效）<br>3. 均匀稳定分流，保证实验单元一致（用户/设备）<br>4. 到期再看，避免连续偷看导致假阳性膨胀<br>5. 报告：相对提升、置信区间、p 值、分段一致性</p>
+<p>「显著」通常指在预设显著性水平（如 0.05）下，观测差异不太可能只由随机性产生。但业务上还要问：提升幅度是否值得上线成本？护栏是否变差？</p>
+<p>加分：提到 CUPED/方差缩减、网络效应（干扰）、SRM（样本比失衡）检查。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">随机分流</span><span class="keyword-chip">MDE</span><span class="keyword-chip">p-value</span><span class="keyword-chip">护栏</span><span class="keyword-chip">SRM</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：p 值不显著就能说没效果吗？</h4>
+            <div class="followup-answer"><p>不能。可能是样本量不够、方差大、效应本身很小。应报告置信区间：可能是「效果接近 0」或「还不确定」。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：为什么不能天天看后台、显著了就停？</h4>
+            <div class="followup-answer"><p>可选停时点会膨胀第一类错误。应预先注册分析计划，或用序贯检验方法。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>未做 SRM 检查就直接下结论</li><li>同时看几十个指标却不做多重比较控制</li><li>把统计显著当成业务必上</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">随机化制造可比性；显著是统计语言，上线还看效应量与护栏。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

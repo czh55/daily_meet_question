@@ -4,5 +4,47 @@
     "slug": "sql-window-vs-groupby",
     "title": "窗口函数和 GROUP BY 有什么区别？各自适用什么场景？",
     "category": "SQL"
+  },
+  {
+    "date": "2026-09-04",
+    "slug": "sql-retention-calculation",
+    "title": "如何用 SQL 计算用户次日留存率？请说清口径与实现思路。",
+    "category": "SQL"
+  },
+  {
+    "date": "2026-09-05",
+    "slug": "sql-index-design",
+    "title": "SQL 索引是怎么工作的？你会如何设计合理的索引？",
+    "category": "SQL"
+  },
+  {
+    "date": "2026-09-06",
+    "slug": "sql-join-types",
+    "title": "INNER JOIN 和 LEFT JOIN 的区别？什么时候用哪种？",
+    "category": "SQL"
+  },
+  {
+    "date": "2026-09-07",
+    "slug": "dw-star-snowflake",
+    "title": "星型模型和雪花模型有什么区别？数仓建模时怎么选？",
+    "category": "数仓建模"
+  },
+  {
+    "date": "2026-09-08",
+    "slug": "metric-system-design",
+    "title": "如果让你从零搭一套产品指标体系，你会怎么设计？",
+    "category": "指标体系"
+  },
+  {
+    "date": "2026-09-09",
+    "slug": "ab-test-basics",
+    "title": "A/B 实验的基本原理是什么？如何判断实验是否显著？",
+    "category": "A/B实验"
+  },
+  {
+    "date": "2026-09-10",
+    "slug": "data-quality-framework",
+    "title": "数据质量你怎么保障？出过数据事故的话怎么定位？",
+    "category": "数据质量"
   }
 ]
