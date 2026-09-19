@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CAP 理论是什么？在数据系统里如何理解一致性？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-09-16</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#14</span>
+                    <span class="problem-type tag-cs">计算机基础</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">CAP 理论是什么？在数据系统里如何理解一致性？</h1>
+                <div class="topic-row"><span class="topic-chip">CAP</span><span class="topic-chip">一致性</span><span class="topic-chip">分布式</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>系统设计与数仓同步常被问到。考察分布式基本盘，能连到「主从延迟/对账」。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>C/A/P 定义与「网络分区时的取舍」。</li><li>澄清：不是永远只能三角选二的口号理解。</li><li>联系实践：缓存、主从、数仓最终一致。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>CAP：在分布式系统中，一致性（Consistency）、可用性（Availability）、分区容忍（Partition tolerance）难以在发生网络分区时同时完美满足。现代分布式系统必须假设 P 可能发生，因此关键时刻往往在 C 与 A 间权衡。</p>
+<p>更细的一致性光谱：<br>- 强一致：读必看到最新写（体验简单，成本高）<br>- 最终一致：短期可能旧，但约定时间内收敛（缓存、主从复制常见）</p>
+<p>数据工作中的映射：<br>- 业务库主从延迟 → 读从库可能旧<br>- 数仓 T+1 → 天生最终一致，靠分区就绪与对账<br>- 指标服务：要声明「数据截至时间」避免假强一致</p>
+<p>回答避免背诵「只能三选二」教条，强调场景化取舍与用户可读的数据新鲜度。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">分区容忍</span><span class="keyword-chip">最终一致</span><span class="keyword-chip">主从延迟</span><span class="keyword-chip">新鲜度</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：BASE 是什么？</h4>
+            <div class="followup-answer"><p>Basically Available、Soft state、Eventually consistent，面向高可用的柔性一致思路，和传统 ACID 强事务相对。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>把 CAP 的 C 和 ACID 的 C 混为一谈</li><li>宣称系统「同时满足 CAP」却说不清降级策略</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">有分区时要在一致与可用间权衡；对数人要声明数据新鲜度。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
