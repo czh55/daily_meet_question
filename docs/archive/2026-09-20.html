@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>特征平台/特征仓库和数仓有什么不同？线上线下特征一致性怎么保证？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-09-20</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#18</span>
+                    <span class="problem-type tag-ml">机器学习基础</span>
+                    <span class="problem-difficulty difficulty-hard">困难</span>
+                </div>
+                <h1 class="problem-title">特征平台/特征仓库和数仓有什么不同？线上线下特征一致性怎么保证？</h1>
+                <div class="topic-row"><span class="topic-chip">特征</span><span class="topic-chip">一致性</span><span class="topic-chip">训练推理</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>算法数据/数据工程交叉题。考察是否理解 train-serve skew。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>数仓服务分析；特征服务模型训练与在线推理。</li><li>一致性风险：口径、时间点、窗口计算。</li><li>手段：同一套计算、回填、监控分布差。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>数仓面向分析与报表，强调口径治理与批量可靠；特征平台面向模型，强调低延迟取特征、点查、以及训练/推理一致。</p>
+<p>最大风险是 train-serve skew：线下训练用的特征与线上推理不一致（时间旅行错误、窗口统计实现不同、缺失值填充不同）。</p>
+<p>保障手段：<br>1. 同一份特征定义与代码路径（或由同一 SQL/DSL 生成离线回填与在线计算）<br>2. 严格的时间对齐：用请求时刻之前的信息，禁止泄露未来<br>3. 离线回放线上日志做一致性校验<br>4. 监控线上线下特征分布漂移</p>
+<p>加分：区分实时特征与批特征；强调数据时间（event time）而非处理时间。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">train-serve skew</span><span class="keyword-chip">时间对齐</span><span class="keyword-chip">回放校验</span><span class="keyword-chip">event time</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：什么是标签泄露？</h4>
+            <div class="followup-answer"><p>训练时用了只有「未来」才知道的信息，导致离线指标虚高、上线失效。特征必须截止在预测时刻之前。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>线下用数仓宽表随便 join 造成未来泄露</li><li>线上一条链路、线下另一套 SQL，长期漂移</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">特征的生命线是训练/推理一致；用同一套定义挡住未来泄露。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
