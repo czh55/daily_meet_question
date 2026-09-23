@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL 中 NULL 有哪些容易踩的坑？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-09-21</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#19</span>
+                    <span class="problem-type tag-sql">SQL</span>
+                    <span class="problem-difficulty difficulty-easy">简单</span>
+                </div>
+                <h1 class="problem-title">SQL 中 NULL 有哪些容易踩的坑？</h1>
+                <div class="topic-row"><span class="topic-chip">NULL</span><span class="topic-chip">三值逻辑</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>细节题，却能区分「写过生产 SQL」的人。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>三值逻辑：TRUE/FALSE/UNKNOWN。</li><li>比较与 NOT IN 陷阱。</li><li>聚合对 NULL 的默认行为。</li><li>用 COALESCE/IS NULL 显式处理。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>NULL 表示「未知」，不是 0 也不是空字符串。</p>
+<p>关键坑：<br>1. <code>= NULL</code> 永远不是 TRUE，应写 <code>IS NULL</code><br>2. <code>NOT IN (1,2,NULL)</code> 结果恒为未知，过滤会「吞掉」行<br>3. 聚合：SUM/AVG 忽略 NULL；COUNT(col) 不计 NULL，COUNT(*) 计行<br>4. 拼接与运算传播 NULL：需要 COALESCE/IFNULL<br>5. JOIN 条件里 NULL 匹配不到</p>
+<p>实践：入库尽量明确默认值或保留 NULL 但在消费层显式处理；对外部输入做空值率 DQ。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">IS NULL</span><span class="keyword-chip">NOT IN</span><span class="keyword-chip">COUNT</span><span class="keyword-chip">COALESCE</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：COUNT(*) 和 COUNT(col) 区别？</h4>
+            <div class="followup-answer"><p>COUNT(*) 计所有行；COUNT(col) 只计该列非 NULL 行。常用二者差值估空值数。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>用 NOT IN 子查询且子查询含 NULL</li><li>把 NULL 当 0 参与平均，导致口径错</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">NULL 是未知；比较用 IS NULL，小心 NOT IN 与聚合默认行为。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

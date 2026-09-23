@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>如何做转化漏斗分析？转化率掉了怎么拆？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-09-14</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#12</span>
+                    <span class="problem-type tag-biz">业务分析</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">如何做转化漏斗分析？转化率掉了怎么拆？</h1>
+                <div class="topic-row"><span class="topic-chip">漏斗</span><span class="topic-chip">归因</span><span class="topic-chip">切片</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>业务数据分析经典题。考察结构化拆解能力与「先定义步骤再取数」。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>定义步骤与时间窗、是否同一会话。</li><li>算各步转化与最长瓶颈步。</li><li>切片：渠道/人群/平台/版本。</li><li>结合定性：可用性、供需、价格、性能。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>漏斗分析步骤：<br>1. 与产品对齐步骤定义（如曝光→点击→下单→支付）及成功事件<br>2. 明确是否要求严格有序、时间窗（当日/7 日内）、用户级还是会话级<br>3. 计算每步人数与步间转化率，定位最大掉失步<br>4. 多维拆解：新老、渠道、机型、地区、价格带、实验组<br>5. 形成假设并验证（改文案/性能/库存/支付方式），能实验就实验</p>
+<p>掉量排查顺序：数据口径与埋点是否变 → 大盘流量结构是否变 → 单步技术故障（白屏/接口）→ 供需与竞争 → 产品策略。</p>
+<p>加分：区分「整体转化」与「同队列转化」；避免把非同一批用户硬比。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">步骤定义</span><span class="keyword-chip">时间窗</span><span class="keyword-chip">瓶颈步</span><span class="keyword-chip">切片</span><span class="keyword-chip">埋点</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：为什么各步 UV 加总会对不上？</h4>
+            <div class="followup-answer"><p>因为用户可跨天、可跳步、可多会话；漏斗是条件路径计数，不是互斥分割。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>步骤定义含糊，不同人算出不同转化</li><li>只看总转化，不拆结构变化</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">先对齐漏斗定义；掉了先找最大掉失步，再切片验证假设。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

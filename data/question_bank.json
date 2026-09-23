@@ -794,7 +794,38 @@
       "过滤",
       "聚合"
     ],
-    "ready": false
+    "ready": true,
+    "intent": "这是 SQL 基础但极易写错的题。考察候选人是否理解「先过滤行、再分组、再过滤组」的逻辑执行顺序，以及能否在业务聚合里把条件放到正确的子句，避免「聚合写进 WHERE」这种硬伤。",
+    "framework": [
+      "先给一句话：WHERE 过滤行，HAVING 过滤分组。",
+      "补执行顺序：FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY。",
+      "举业务例子：先筛有效订单，再按用户汇总，再留下消费超过阈值的用户。",
+      "收尾讲性能与别名：能 WHERE 就别 HAVING；SELECT 别名通常不能给 WHERE 用。"
+    ],
+    "answer": "一句话：WHERE 在分组前按行过滤；HAVING 在分组后按组过滤。所以「某行满不满足条件」用 WHERE，「某一组的汇总满不满足条件」用 HAVING。\n\n逻辑执行顺序可以记成：`FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY`。WHERE 看不到聚合结果，因此 `WHERE COUNT(*) > 1` 会直接报错或语义非法；这类条件必须放到 HAVING。\n\n业务例子：统计「有效订单金额 ≥ 1000 的用户」。\n1. 先用 WHERE 丢掉退款/测试单，减少参与聚合的行\n2. 再 `GROUP BY user_id` 求每人金额\n3. 最后 `HAVING SUM(amount) >= 1000` 留下达标的组\n\n```sql\nSELECT user_id, SUM(amount) AS gmv\nFROM orders\nWHERE status = 'paid'\nGROUP BY user_id\nHAVING SUM(amount) >= 1000;\n```\n\n性能上：WHERE 越早砍行，扫描和 shuffle 越小；非聚合条件不要偷懒写进 HAVING。HAVING 不跟 GROUP BY 时，整张结果被当成一组，常用来写「全表汇总后再判断」的查询。",
+    "followups": [
+      {
+        "q": "能不能只用 HAVING、不用 WHERE？",
+        "a": "语法上有时能跑通，但不该这么写。非聚合过滤放 HAVING，等于先把不该参与分组的行也聚合进去，再丢掉整组或整表，既慢又容易把口径算错。能在行级排除的，一律 WHERE。"
+      },
+      {
+        "q": "HAVING 里能用 SELECT 的别名吗？比如 HAVING gmv >= 1000？",
+        "a": "标准语义里 HAVING 发生在 SELECT 之前，别名还没诞生，多数引擎要重复写表达式：`HAVING SUM(amount) >= 1000`。MySQL 等方言可能放行别名，但面试和跨引擎代码应当它不存在，避免换仓就挂。"
+      }
+    ],
+    "pitfalls": [
+      "把 COUNT/SUM 条件写进 WHERE，引擎直接拒绝或语义错",
+      "行级条件（状态、日期、类型）却写在 HAVING，丢掉前期剪枝",
+      "以为 HAVING 一定能用 SELECT 别名，换引擎后报错"
+    ],
+    "keywords": [
+      "行过滤",
+      "组过滤",
+      "执行顺序",
+      "GROUP BY",
+      "聚合条件"
+    ],
+    "anchor": "WHERE 在分组前砍行；HAVING 在分组后砍组。"
   },
   {
     "id": 22,
