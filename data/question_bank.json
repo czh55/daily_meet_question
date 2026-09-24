@@ -794,7 +794,38 @@
       "过滤",
       "聚合"
     ],
-    "ready": false
+    "ready": true,
+    "intent": "这是 SQL 基础但极易写错的题。考察候选人是否理解「先过滤行、再分组、再过滤组」的逻辑执行顺序，以及能否在业务聚合里把条件放到正确的子句，避免「聚合写进 WHERE」这种硬伤。",
+    "framework": [
+      "先给一句话：WHERE 过滤行，HAVING 过滤分组。",
+      "补执行顺序：FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY。",
+      "举业务例子：先筛有效订单，再按用户汇总，再留下消费超过阈值的用户。",
+      "收尾讲性能与别名：能 WHERE 就别 HAVING；SELECT 别名通常不能给 WHERE 用。"
+    ],
+    "answer": "一句话：WHERE 在分组前按行过滤；HAVING 在分组后按组过滤。所以「某行满不满足条件」用 WHERE，「某一组的汇总满不满足条件」用 HAVING。\n\n逻辑执行顺序可以记成：`FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY`。WHERE 看不到聚合结果，因此 `WHERE COUNT(*) > 1` 会直接报错或语义非法；这类条件必须放到 HAVING。\n\n业务例子：统计「有效订单金额 ≥ 1000 的用户」。\n1. 先用 WHERE 丢掉退款/测试单，减少参与聚合的行\n2. 再 `GROUP BY user_id` 求每人金额\n3. 最后 `HAVING SUM(amount) >= 1000` 留下达标的组\n\n```sql\nSELECT user_id, SUM(amount) AS gmv\nFROM orders\nWHERE status = 'paid'\nGROUP BY user_id\nHAVING SUM(amount) >= 1000;\n```\n\n性能上：WHERE 越早砍行，扫描和 shuffle 越小；非聚合条件不要偷懒写进 HAVING。HAVING 不跟 GROUP BY 时，整张结果被当成一组，常用来写「全表汇总后再判断」的查询。",
+    "followups": [
+      {
+        "q": "能不能只用 HAVING、不用 WHERE？",
+        "a": "语法上有时能跑通，但不该这么写。非聚合过滤放 HAVING，等于先把不该参与分组的行也聚合进去，再丢掉整组或整表，既慢又容易把口径算错。能在行级排除的，一律 WHERE。"
+      },
+      {
+        "q": "HAVING 里能用 SELECT 的别名吗？比如 HAVING gmv >= 1000？",
+        "a": "标准语义里 HAVING 发生在 SELECT 之前，别名还没诞生，多数引擎要重复写表达式：`HAVING SUM(amount) >= 1000`。MySQL 等方言可能放行别名，但面试和跨引擎代码应当它不存在，避免换仓就挂。"
+      }
+    ],
+    "pitfalls": [
+      "把 COUNT/SUM 条件写进 WHERE，引擎直接拒绝或语义错",
+      "行级条件（状态、日期、类型）却写在 HAVING，丢掉前期剪枝",
+      "以为 HAVING 一定能用 SELECT 别名，换引擎后报错"
+    ],
+    "keywords": [
+      "行过滤",
+      "组过滤",
+      "执行顺序",
+      "GROUP BY",
+      "聚合条件"
+    ],
+    "anchor": "WHERE 在分组前砍行；HAVING 在分组后砍组。"
   },
   {
     "id": 22,
@@ -805,7 +836,38 @@
     "topics": [
       "JOIN"
     ],
-    "ready": false
+    "ready": true,
+    "intent": "考察候选人是否把 JOIN 理解成「两份行集按键对齐」，而不是「必须两张不同的表」。自连接是组织树、配对、找前后事件的高频手法，答得出场景和别名，才说明真会用。",
+    "framework": [
+      "先定义：同一张表当两份行集来 JOIN，必须各自取别名。",
+      "说清为什么需要它：一行要同时看到「自己」和「另一行」的字段。",
+      "举 1–2 个业务例子：员工-经理、用户邀请人、同日配对。",
+      "补一句边界：多层层级更适合递归 CTE；一对多要防行膨胀。"
+    ],
+    "answer": "一句话：自连接就是把同一张表当两份数据来 JOIN。表还是那张表，但你给它两个别名，让每一行去对齐「另一行」。\n\n为什么需要：SQL 一次只看见当前行。当你要同时拿到「我」和「跟我有关系的那一行」（上级、邀请人、上一笔订单、配对用户）时，就把表再挂一次。\n\n经典场景 1：员工表找直属经理。\n```sql\nSELECT e.name AS employee, m.name AS manager\nFROM staff e\nLEFT JOIN staff m ON e.manager_id = m.id;\n```\n用 LEFT JOIN，是因为老板没有上级，INNER 会把顶层丢掉。\n\n经典场景 2：邀请关系 / 同城配对。用户表自己连自己：`u.inviter_id = i.id` 拿邀请人；或 `a.city = b.city AND a.id < b.id` 做去重配对，避免 (A,B) 和 (B,A) 各出一次。\n\n口述加分：自连接的本质不是「特殊 JOIN」，而是「同一实体扮演两个角色」。别名就是角色名：员工 vs 经理、被邀请人 vs 邀请人。层级超过一两层，优先递归 CTE，别把自连接叠成五六次。",
+    "followups": [
+      {
+        "q": "组织树要查「所有下级」而不是直属上级，还用自连接吗？",
+        "a": "直属一层用自连接就够。整棵子树要用递归 CTE（`WITH RECURSIVE`）或闭包表。硬把自连接写 N 次只能覆盖固定深度，层级一变就漏人。"
+      },
+      {
+        "q": "自连接为什么特别容易把行数打爆？",
+        "a": "因为是一对多再对多。条件太松（只按城市、只按日期）会接近笛卡尔积。配对题要加 `a.id < b.id` 去重；聚合前先确认粒度，必要时先收窄再 JOIN。"
+      }
+    ],
+    "pitfalls": [
+      "同一张表不写别名，引擎无法区分两份行集",
+      "员工-经理用 INNER JOIN，把没有上级的顶层过滤掉",
+      "配对条件缺 `id <` / `id <>`，结果翻倍或自己连自己"
+    ],
+    "keywords": [
+      "别名",
+      "同一张表",
+      "员工-经理",
+      "LEFT JOIN",
+      "配对去重"
+    ],
+    "anchor": "自连接是同一张表扮演两个角色；别名就是角色名。"
   },
   {
     "id": 23,
