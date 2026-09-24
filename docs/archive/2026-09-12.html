@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设计一条从业务库到数仓的日更 ETL 链路，你会怎么做？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-09-12</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#10</span>
+                    <span class="problem-type tag-de">数据工程</span>
+                    <span class="problem-difficulty difficulty-hard">困难</span>
+                </div>
+                <h1 class="problem-title">设计一条从业务库到数仓的日更 ETL 链路，你会怎么做？</h1>
+                <div class="topic-row"><span class="topic-chip">ETL</span><span class="topic-chip">调度</span><span class="topic-chip">增量同步</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>数据工程师招牌题。考察端到端链路设计：抽取、落地、质量、调度与失败恢复。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>目标与约束：延迟、完整性、回放能力。</li><li>架构分层：ODS → DWD → DWS → ADS。</li><li>增量策略：时间戳/binlog/快照对比。</li><li>调度、监控、补数与幂等。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>按分层与可靠性讲：</p>
+<ul><li>需求：日更 T+1，核心表 6:00 前就绪；可按日重跑。</li><li>接入 ODS：优先业务库只读账号；大表用增量（updated_at 水位或 binlog CDC）；小表可全量。落地分区表 <code>dt=YYYY-MM-DD</code>，保留原始字段。</li><li>清洗 DWD：统一时区/枚举、去重（按业务主键取最新）、敏感字段脱敏、主键与外键校验。</li><li>汇总 DWS/ADS：按主题建明细与汇总，供指标与看板。</li><li>调度：依赖上游就绪信号；失败重试；关键路径报警。</li><li>可靠性：任务幂等（同分区可重跑覆盖）；DQ 门禁不通过不交付下游；文档化口径与 owner。</li></ul>
+<p>加分：提到迟到数据、幂等去重、schema 演进、成本（分区裁剪与小文件合并）。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">ODS/DWD/DWS</span><span class="keyword-chip">增量水位</span><span class="keyword-chip">幂等</span><span class="keyword-chip">分区</span><span class="keyword-chip">DQ 门禁</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：如何保证重跑不产生重复数据？</h4>
+            <div class="followup-answer"><p>以分区覆盖写或 merge into；去重键明确；避免 append-only 无去重。CDC 场景用主键+版本号取最新。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>直接在业务库跑重查询当数仓</li><li>无分区、不可重跑，一次失败只能手工修</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">分层解耦；分区可重跑；质量门禁后再交付。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
