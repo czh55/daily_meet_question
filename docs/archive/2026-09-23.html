@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HAVING 和 WHERE 的区别是什么？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-09-23</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#21</span>
+                    <span class="problem-type tag-sql">SQL</span>
+                    <span class="problem-difficulty difficulty-easy">简单</span>
+                </div>
+                <h1 class="problem-title">HAVING 和 WHERE 的区别是什么？</h1>
+                <div class="topic-row"><span class="topic-chip">过滤</span><span class="topic-chip">聚合</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>这是 SQL 基础但极易写错的题。考察候选人是否理解「先过滤行、再分组、再过滤组」的逻辑执行顺序，以及能否在业务聚合里把条件放到正确的子句，避免「聚合写进 WHERE」这种硬伤。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先给一句话：WHERE 过滤行，HAVING 过滤分组。</li><li>补执行顺序：FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY。</li><li>举业务例子：先筛有效订单，再按用户汇总，再留下消费超过阈值的用户。</li><li>收尾讲性能与别名：能 WHERE 就别 HAVING；SELECT 别名通常不能给 WHERE 用。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：WHERE 在分组前按行过滤；HAVING 在分组后按组过滤。所以「某行满不满足条件」用 WHERE，「某一组的汇总满不满足条件」用 HAVING。</p>
+<p>逻辑执行顺序可以记成：<code>FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY</code>。WHERE 看不到聚合结果，因此 <code>WHERE COUNT(*) &gt; 1</code> 会直接报错或语义非法；这类条件必须放到 HAVING。</p>
+<p>业务例子：统计「有效订单金额 ≥ 1000 的用户」。<br>1. 先用 WHERE 丢掉退款/测试单，减少参与聚合的行<br>2. 再 <code>GROUP BY user_id</code> 求每人金额<br>3. 最后 <code>HAVING SUM(amount) &gt;= 1000</code> 留下达标的组</p>
+<pre><code>SELECT user_id, SUM(amount) AS gmv
+FROM orders
+WHERE status = 'paid'
+GROUP BY user_id
+HAVING SUM(amount) &gt;= 1000;</code></pre>
+<p>性能上：WHERE 越早砍行，扫描和 shuffle 越小；非聚合条件不要偷懒写进 HAVING。HAVING 不跟 GROUP BY 时，整张结果被当成一组，常用来写「全表汇总后再判断」的查询。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">行过滤</span><span class="keyword-chip">组过滤</span><span class="keyword-chip">执行顺序</span><span class="keyword-chip">GROUP BY</span><span class="keyword-chip">聚合条件</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：能不能只用 HAVING、不用 WHERE？</h4>
+            <div class="followup-answer"><p>语法上有时能跑通，但不该这么写。非聚合过滤放 HAVING，等于先把不该参与分组的行也聚合进去，再丢掉整组或整表，既慢又容易把口径算错。能在行级排除的，一律 WHERE。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：HAVING 里能用 SELECT 的别名吗？比如 HAVING gmv &gt;= 1000？</h4>
+            <div class="followup-answer"><p>标准语义里 HAVING 发生在 SELECT 之前，别名还没诞生，多数引擎要重复写表达式：<code>HAVING SUM(amount) &gt;= 1000</code>。MySQL 等方言可能放行别名，但面试和跨引擎代码应当它不存在，避免换仓就挂。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>把 COUNT/SUM 条件写进 WHERE，引擎直接拒绝或语义错</li><li>行级条件（状态、日期、类型）却写在 HAVING，丢掉前期剪枝</li><li>以为 HAVING 一定能用 SELECT 别名，换引擎后报错</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">WHERE 在分组前砍行；HAVING 在分组后砍组。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

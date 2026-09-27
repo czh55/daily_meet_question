@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>如果让你从零搭一套产品指标体系，你会怎么设计？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-09-08</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#6</span>
+                    <span class="problem-type tag-metric">指标体系</span>
+                    <span class="problem-difficulty difficulty-hard">困难</span>
+                </div>
+                <h1 class="problem-title">如果让你从零搭一套产品指标体系，你会怎么设计？</h1>
+                <div class="topic-row"><span class="topic-chip">北极星指标</span><span class="topic-chip">护栏指标</span><span class="topic-chip">埋点</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>综合题：业务理解 + 指标分层 + 数据落地。区分「背指标名」和「能搭可治理体系」。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>对齐业务目标与阶段（拉新/激活/留存/变现）。</li><li>定北极星 + 输入指标 + 护栏指标。</li><li>拆解到可观测事件与维度。</li><li>谈口径文档、权威数据源、复盘机制。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>我会按「目标 → 指标树 → 数据采集 → 治理」四步说：</p>
+<ul><li>对齐目标：先问产品当前阶段。工具类可能看 WAU/关键任务完成；内容类看消费时长与留存；交易类看 GMV 与购转。</li><li>分层建树：</li><li>北极星：最能代表长期价值的单一指标</li><li>驱动指标：可行动的过程量（漏斗各步、频次、时长）</li><li>护栏指标：防止「刷」北极星（投诉率、崩溃率、退款率）</li><li>落地：每个指标写清口径（分子分母、时间窗、去重键）；映射到埋点事件/属性；指定权威表（one source of truth）。</li><li>治理：指标字典、变更评审、异常报警、周复盘看「哪一层掉了」。</li></ul>
+<p>加分点：提到 OSM 模型或 AARRR；强调「少而准」，宁缺毋滥，避免指标膨胀。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">北极星</span><span class="keyword-chip">护栏</span><span class="keyword-chip">口径文档</span><span class="keyword-chip">权威数据源</span><span class="keyword-chip">可行动</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：北极星指标选错了会怎样？</h4>
+            <div class="followup-answer"><p>团队会优化局部而伤害长期价值，例如只追 DAU 导致低质拉新、留存与口碑下滑。应用护栏和长期队列指标对冲。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>堆很多 vanity metrics（访问量）却没有可行动指标</li><li>口径散落在多个看板，同一指标三个数</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">指标是战略翻译；先目标后指标，护栏防副作用，口径要唯一。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

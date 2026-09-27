@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ODS/DWD/DWS/ADS 各层职责是什么？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-09-26</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#24</span>
+                    <span class="problem-type tag-dw">数仓建模</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">ODS/DWD/DWS/ADS 各层职责是什么？</h1>
+                <div class="topic-row"><span class="topic-chip">分层</span><span class="topic-chip">ODS</span><span class="topic-chip">DWD</span><span class="topic-chip">DWS</span><span class="topic-chip">ADS</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>数仓分层是数据工程面试的基本盘。考察候选人会不会只背四个缩写，还是能讲清每层存什么、粒度是什么、谁可以出数、以及为什么禁止跨层乱引用。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先说分层目的：把「原样接入」和「可分析可复用」拆开，挡住口径漂移与返工。</li><li>按数据形态讲四层：ODS 贴源、DWD 明细、DWS 汇总、ADS 应用。</li><li>明确消费边界：分析师默认从 DWS/ADS 取数，DWD 做下钻，ODS 不对外。</li><li>补一句实践：公司命名可能不同（STG/DIM/DWT），但职责不能混。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：分层是在「保真接入」和「稳定出数」之间加缓冲。ODS 尽量像源系统，往上每层多做一次清洗、建模和聚合，让下游少踩坑。</p>
+<p>四层可以这样口述：<br>1. <strong>ODS（Operational Data Store / 贴源层）</strong>：按源系统原样或近原样落入仓，保留源字段、源主键、同步时间。可以做技术性转换（编码、分区、软删标记），但不要在这里改业务口径。职责是可回溯、可重放。<br>2. <strong>DWD（Data Warehouse Detail / 明细层）</strong>：统一命名、统一时间与币种、脏数据清洗、维表退化/关联，形成「一件业务事实一行」的明细。粒度跟业务事件走：一笔订单、一次曝光、一条日志。这是最重要的可复用层。<br>3. <strong>DWS（Data Warehouse Summary / 汇总层）</strong>：按主题把高频分析路径预聚合，例如用户日、商品日、渠道日。粒度是「实体 + 时间窗」，指标要有明确口径主人。<br>4. <strong>ADS（Application Data Service / 应用层）</strong>：面向具体报表、看板、接口的宽表或结果表。可以「丑」，但必须稳定、可回刷、和产品口径对齐。</p>
+<p>谁用哪一层：调度与回刷看 ODS；数据开发主要建设 DWD/DWS；分析默认 DWS，下钻回 DWD；产品看板走 ADS。跨层禁忌是 ADS 直接扫 ODS、或者每个需求都从 ODS 现算——口径会在 SQL 里分叉。</p>
+<p>加分：提到 DIM 维表层、公共中间层不要和 ADS 抢职责；以及「一层只做一类事」，比「层数必须是四」更重要。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">贴源</span><span class="keyword-chip">明细粒度</span><span class="keyword-chip">主题汇总</span><span class="keyword-chip">应用宽表</span><span class="keyword-chip">禁止跨层乱引</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：为什么分析师不能直接查 ODS？</h4>
+            <div class="followup-answer"><p>ODS 保留源系统脏值和历史变更，字段名不统一，还可能有重复同步。直接查等于每个需求各自清洗一遍，GMV、用户数会对不上。ODS 的价值是回溯和重跑，不是出数。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：DWD 和 DWS 的粒度怎么定？明细指标能不能放 ADS？</h4>
+            <div class="followup-answer"><p>DWD 跟事件粒度：一单一行、一曝光一行，不在这里按天求和。DWS 跟分析粒度：用户×日、店铺×日。ADS 可以再做一个「首页只要 20 个字段」的结果表，甚至保留少量明细字段方便下钻，但核心汇总口径应先在 DWS 沉淀，避免每个看板自己算一遍 GMV。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>在 ODS 里改业务口径，源系统一变就无法对账</li><li>跳过 DWD，每个 ADS 各自 join 清洗，口径分叉</li><li>把 DWS 做成「一张超级宽表包打天下」，既难维护又难回刷</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">ODS 保真，DWD 保明细，DWS 保口径，ADS 保交付。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
