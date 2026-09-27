@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DAU/MAU 如何定义？有哪些坑？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-09-25</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#23</span>
+                    <span class="problem-type tag-metric">指标体系</span>
+                    <span class="problem-difficulty difficulty-easy">简单</span>
+                </div>
+                <h1 class="problem-title">DAU/MAU 如何定义？有哪些坑？</h1>
+                <div class="topic-row"><span class="topic-chip">活跃</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>DAU/MAU 是产品与数据岗最高频的活跃指标。考察候选人会不会先锁「活跃定义 + 去重键 + 时间窗」，而不是背两个缩写；以及能否指出黏性比、口径漂移、分母膨胀这些常见误读。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先定义：两者都是窗口内去重活跃用户数，差在日窗还是月窗。</li><li>说清活跃口径：启动、登录，还是完成关键行为；用账号还是设备去重。</li><li>补 DAU/MAU 黏性比怎么读，以及它何时失效。</li><li>点出坑：口径漂移、时区、机器人、用 PV 冒充人数。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：DAU 是「某一自然日有过活跃的去重用户数」；MAU 是「某一自然月有过活跃的去重用户数」。分子不是打开次数，是人（或账号/设备）。</p>
+<p>口述必须先锁三件事，否则数字不可比：<br>1. 活跃定义：打开 App、登录成功，还是完成一次关键行为（看一篇、下一单）。启动口径虚高，关键行为更贴业务。<br>2. 去重键：<code>user_id</code> 还是设备 ID。未登录流量用设备，登录后应用账号，混用会双计。<br>3. 时间窗与时区：自然日/自然月，按业务时区切，不是 UTC 随便切，也不是滚动 24h/30d（那是滚动活跃，要另说）。</p>
+<p>实现上通常先有日活明细 <code>dau(user_id, dt)</code>，再：</p>
+<pre><code>-- 某日 DAU
+SELECT dt, COUNT(DISTINCT user_id) AS dau
+FROM user_active
+WHERE dt = '2026-09-25'
+GROUP BY 1;
+
+-- 某月 MAU：月内去重，不是把每天 DAU 加总
+SELECT date_trunc('month', dt) AS month,
+       COUNT(DISTINCT user_id) AS mau
+FROM user_active
+WHERE dt &gt;= '2026-09-01' AND dt &lt; '2026-10-01'
+GROUP BY 1;</code></pre>
+<p><code>DAU/MAU</code> 常被叫黏性：接近 1 说明月活用户几乎天天来；接近 1/30 说明很多人月内只来一次。它是结构指标，不是「越高产品越好」的单一分数——拉新一波低频用户，MAU 涨、比值反而掉，这可能是获客而不是产品变差。</p>
+<p>加分：主动区分 DAU、日启动次数、PV；月活 ≠ 日活求和；和留存是两件事，留存看同一批人回不回来。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">去重用户</span><span class="keyword-chip">活跃口径</span><span class="keyword-chip">自然日/月</span><span class="keyword-chip">黏性比</span><span class="keyword-chip">人日 vs 人数</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：DAU/MAU 突然上升，一定说明产品变好了吗？</h4>
+            <div class="followup-answer"><p>不一定。先核口径：活跃定义是否改严/改松、是否上了自动心跳、机器人/刷量、时区或去重键变更。再看结构：是老用户更勤，还是拉进一波只来一天的新用户。MAU 膨胀时黏性比会掉，要配留存、人均频次、关键行为转化一起看，不能只报一个比值。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：为什么不能把每天 DAU 加总当 MAU？</h4>
+            <div class="followup-answer"><p>因为同一个人会在多天活跃，加总会重复计数。MAU 是月窗口内 <code>COUNT(DISTINCT user_id)</code>。日活求和近似「活跃人日」，量纲是人次不是人数。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>把打开次数/PV 当成 DAU，人数被事件量刷高</li><li>改活跃定义或去重键却不做口径切换说明，环比全部失真</li><li>用 DAU 加总当 MAU，或把 DAU/MAU 直接当成留存率</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">DAU/MAU 是窗口内去重活跃人数；先锁口径，再解释涨跌。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

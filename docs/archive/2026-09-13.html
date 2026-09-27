@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python 的 GIL 是什么？对多线程/多进程选型有什么影响？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-09-13</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#11</span>
+                    <span class="problem-type tag-python">Python</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">Python 的 GIL 是什么？对多线程/多进程选型有什么影响？</h1>
+                <div class="topic-row"><span class="topic-chip">GIL</span><span class="topic-chip">并发</span><span class="topic-chip">性能</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>后端/数据岗基础功。考察是否理解 CPython 并发真相，避免「开了多线程就并行」的幻觉。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>GIL：同一时刻仅一个线程执行 Python 字节码。</li><li>CPU 密集 vs IO 密集选型。</li><li>替代：multiprocessing、异步 IO、C 扩展释放 GIL。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>GIL（全局解释器锁）是 CPython 的机制：同一进程内同一时刻只有一个线程在执行 Python 字节码，用来简化内存管理。</p>
+<p>影响：<br>- CPU 密集（纯 Python 计算）：多线程几乎不能加速，反而可能更慢 → 用多进程（multiprocessing）或把计算下沉到 NumPy/原生扩展<br>- IO 密集（等网络/磁盘）：线程在 IO 时会释放 GIL，多线程仍有用；也可用 asyncio</p>
+<p>数据场景常见做法：Pandas/Spark 本身释放或绕开 GIL 限制；本地并行预处理用进程池；爬虫/请求用线程或异步。</p>
+<p>注意：GIL 不是语言语法的一部分，PyPy 等实现不同；回答时点明「主要针对 CPython」。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">CPython</span><span class="keyword-chip">CPU vs IO</span><span class="keyword-chip">多进程</span><span class="keyword-chip">asyncio</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：为什么 NumPy 大数组运算可以较好地利用多核？</h4>
+            <div class="followup-answer"><p>多数计算在释放了 GIL 的 C/Fortran 层完成，不占用 Python 字节码执行路径。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>CPU 任务盲目 ThreadPool，结果变慢</li><li>多进程间大数据通信开销被忽略</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">GIL 下：CPU 用进程，IO 用线程/异步。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

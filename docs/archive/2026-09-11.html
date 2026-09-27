@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spark 作业里 Shuffle 是什么？常见 OOM / 数据倾斜怎么处理？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-09-11</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#9</span>
+                    <span class="problem-type tag-bigdata">大数据计算</span>
+                    <span class="problem-difficulty difficulty-hard">困难</span>
+                </div>
+                <h1 class="problem-title">Spark 作业里 Shuffle 是什么？常见 OOM / 数据倾斜怎么处理？</h1>
+                <div class="topic-row"><span class="topic-chip">Spark</span><span class="topic-chip">Shuffle</span><span class="topic-chip">倾斜</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>大数据岗位常考。考察对分布式执行代价的理解，以及线上排障经验。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>定义 Shuffle：跨节点按键重新分区交换数据。</li><li>为何贵：磁盘/网络/序列化，易成瓶颈。</li><li>倾斜表现：少数 task 极慢或 OOM。</li><li>治理：预处理、加盐、两阶段聚合、广播小表等。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>Shuffle 是宽依赖触发的数据重分布：按新的分区键把记录从 map 端拉到 reduce 端。join、groupBy、repartition 都可能触发。</p>
+<p>它贵，因为涉及序列化、网络传输、磁盘落盘与大量内存缓冲，常是阶段耗时大头。</p>
+<p>数据倾斜：某些 key 数据量远大于其他，导致个别 task 处理巨量数据 → 长尾或 OOM。</p>
+<p>常见手段：<br>1. 先确认：看 stage 的 task 耗时分布、关键大小<br>2. 业务侧过滤无效热点 key / 预处理打散<br>3. 加盐：热点 key 加随机前缀再聚合，再去盐二次聚合<br>4. 两阶段聚合：先局部聚合再全局<br>5. join：小表广播（map-side join）避免大 shuffle；大表对大表考虑分桶/倾斜 join 策略<br>6. 内存：增大 executor memory、合理 partition 数、避免无必要 cache 大对象</p>
+<p>回答要强调「先定位再优化」，不要一上来盲目加资源。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">宽依赖</span><span class="keyword-chip">倾斜</span><span class="keyword-chip">加盐</span><span class="keyword-chip">广播 Join</span><span class="keyword-chip">两阶段聚合</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：partition 是不是越多越好？</h4>
+            <div class="followup-answer"><p>不是。太少并行不够、单分区过大；太多调度与小文件开销上升。通常按数据量与核数估算，再按实测调。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>把 driver OOM 和 executor OOM 混为一谈</li><li>忽略小文件问题，只追执行速度</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">Shuffle 是分布式的税；倾斜是税里的尖刺，先定位热点 key。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
