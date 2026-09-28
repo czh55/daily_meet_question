@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星型模型和雪花模型有什么区别？数仓建模时怎么选？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-09-07</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#5</span>
+                    <span class="problem-type tag-dw">数仓建模</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">星型模型和雪花模型有什么区别？数仓建模时怎么选？</h1>
+                <div class="topic-row"><span class="topic-chip">维度建模</span><span class="topic-chip">事实表</span><span class="topic-chip">维度表</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>数据工程师/分析师核心建模题。考察是否理解事实/维度分工，以及性能与规范的权衡。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先定义：事实表存度量+外键；维度表存描述属性。</li><li>星型：维度直接连事实；雪花：维度再规范化拆分。</li><li>对比查询复杂度、存储、ETL 维护成本。</li><li>给出选型建议：分析场景多数偏星型/宽表。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>维度建模里：事实表记录「发生了什么」（可加度量、外键）；维度表描述「在什么环境下」（谁、何时、何地、何商品）。</p>
+<p>星型模型：事实表周围直接挂一圈维度表，维度基本不继续拆。查询路径短，BI 友好。<br>雪花模型：维度表继续规范化（如商品→品类→大类），更省存储、更少冗余，但 JOIN 更多、理解成本更高。</p>
+<p>实践建议：<br>- OLAP/报表为主：优先星型，甚至对热点维度做宽表/冗余字段换查询简单<br>- 维度层次复杂且需强一致维护：局部可雪花，但对外仍可提供扁平视图<br>- 现代仓（Snowflake/BigQuery/Hive）存储便宜，往往「适度反规范化」更划算</p>
+<p>回答加分：提到粒度（grain）必须先定；事实分事务/周期快照/累积快照。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">事实表</span><span class="keyword-chip">维度表</span><span class="keyword-chip">粒度</span><span class="keyword-chip">反规范化</span><span class="keyword-chip">星型</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：什么是退化维度？</h4>
+            <div class="followup-answer"><p>本可做成维度、但属性极少（如订单号），直接存在事实表中的标识字段，避免多余维度表。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>没定事实粒度就开始加字段，后期无法聚合</li><li>过度雪花导致每次取数 6–7 张表 JOIN</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">先定粒度；分析场景多数用星型（短路径），不为范式而范式。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

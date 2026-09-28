@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>什么是自连接？举例说明业务场景。 | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-09-24</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#22</span>
+                    <span class="problem-type tag-sql">SQL</span>
+                    <span class="problem-difficulty difficulty-easy">简单</span>
+                </div>
+                <h1 class="problem-title">什么是自连接？举例说明业务场景。</h1>
+                <div class="topic-row"><span class="topic-chip">JOIN</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察候选人是否把 JOIN 理解成「两份行集按键对齐」，而不是「必须两张不同的表」。自连接是组织树、配对、找前后事件的高频手法，答得出场景和别名，才说明真会用。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先定义：同一张表当两份行集来 JOIN，必须各自取别名。</li><li>说清为什么需要它：一行要同时看到「自己」和「另一行」的字段。</li><li>举 1–2 个业务例子：员工-经理、用户邀请人、同日配对。</li><li>补一句边界：多层层级更适合递归 CTE；一对多要防行膨胀。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：自连接就是把同一张表当两份数据来 JOIN。表还是那张表，但你给它两个别名，让每一行去对齐「另一行」。</p>
+<p>为什么需要：SQL 一次只看见当前行。当你要同时拿到「我」和「跟我有关系的那一行」（上级、邀请人、上一笔订单、配对用户）时，就把表再挂一次。</p>
+<p>经典场景 1：员工表找直属经理。</p>
+<pre><code>SELECT e.name AS employee, m.name AS manager
+FROM staff e
+LEFT JOIN staff m ON e.manager_id = m.id;</code></pre>
+<p>用 LEFT JOIN，是因为老板没有上级，INNER 会把顶层丢掉。</p>
+<p>经典场景 2：邀请关系 / 同城配对。用户表自己连自己：<code>u.inviter_id = i.id</code> 拿邀请人；或 <code>a.city = b.city AND a.id &lt; b.id</code> 做去重配对，避免 (A,B) 和 (B,A) 各出一次。</p>
+<p>口述加分：自连接的本质不是「特殊 JOIN」，而是「同一实体扮演两个角色」。别名就是角色名：员工 vs 经理、被邀请人 vs 邀请人。层级超过一两层，优先递归 CTE，别把自连接叠成五六次。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">别名</span><span class="keyword-chip">同一张表</span><span class="keyword-chip">员工-经理</span><span class="keyword-chip">LEFT JOIN</span><span class="keyword-chip">配对去重</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：组织树要查「所有下级」而不是直属上级，还用自连接吗？</h4>
+            <div class="followup-answer"><p>直属一层用自连接就够。整棵子树要用递归 CTE（<code>WITH RECURSIVE</code>）或闭包表。硬把自连接写 N 次只能覆盖固定深度，层级一变就漏人。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：自连接为什么特别容易把行数打爆？</h4>
+            <div class="followup-answer"><p>因为是一对多再对多。条件太松（只按城市、只按日期）会接近笛卡尔积。配对题要加 <code>a.id &lt; b.id</code> 去重；聚合前先确认粒度，必要时先收窄再 JOIN。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>同一张表不写别名，引擎无法区分两份行集</li><li>员工-经理用 INNER JOIN，把没有上级的顶层过滤掉</li><li>配对条件缺 <code>id &lt;</code> / <code>id &lt;&gt;</code>，结果翻倍或自己连自己</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">自连接是同一张表扮演两个角色；别名就是角色名。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
