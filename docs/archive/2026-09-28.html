@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spark 窄依赖和宽依赖的区别？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-09-28</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#26</span>
+                    <span class="problem-type tag-bigdata">大数据计算</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">Spark 窄依赖和宽依赖的区别？</h1>
+                <div class="topic-row"><span class="topic-chip">RDD</span><span class="topic-chip">依赖</span><span class="topic-chip">Shuffle</span><span class="topic-chip">Stage</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察候选人对 Spark 执行图的本质理解：依赖类型决定要不要 Shuffle、Stage 怎么切、失败了怎么恢复。答成「map 是窄、groupBy 是宽」不够，要能讲清分区对应关系与代价。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先给定义：看父 RDD 的一个分区，会被几个子分区用到。</li><li>对照典型算子：map/filter 是窄；groupByKey/reduceByKey/join 是宽。</li><li>落到执行：宽依赖触发 Shuffle，是 Stage 边界。</li><li>补容错差异：窄依赖可从父分区局部重算，宽依赖常要重做整个 Shuffle。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：窄依赖是「父分区一对一（或固定少量）喂给子分区」；宽依赖是「父分区的记录要按键打散到多个子分区」。宽依赖通常意味着 Shuffle。</p>
+<p>窄依赖（Narrow Dependency）：<br>- 每个父分区最多被一个子分区使用，分区关系编译期就确定。<br>- 典型：<code>map</code>、<code>filter</code>、<code>flatMap</code>、<code>union</code>、<code>mapPartitions</code>；对已按同一键分区好的 <code>join</code>/<code>cogroup</code> 也可能是窄的（co-partition）。<br>- 好处：pipeline 在同一个 Stage 里流水执行，不必跨节点换数据；某个分区失败，只重算对应的父分区即可。</p>
+<p>宽依赖（Wide / Shuffle Dependency）：<br>- 一个父分区的数据可能进入多个子分区，要等上游写完 shuffle 文件，下游按键拉取。<br>- 典型：<code>groupByKey</code>、<code>reduceByKey</code>、<code>join</code>（未同分区）、<code>distinct</code>、<code>repartition</code>、<code>sortByKey</code>。<br>- DAGScheduler 在宽依赖处切 Stage：窄依赖串成一个 Stage 流水线，宽依赖是 Stage 之间的边界。</p>
+<p>面试加分可以落到代价：Shuffle 有序列化、网络、落盘、内存缓冲，是作业变慢和 OOM 的高发区。所以能 <code>map-side combine</code> 的（<code>reduceByKey</code>）优于先全量 <code>groupByKey</code>；小表能广播就别走大 join。</p>
+<p>对照四句话带走：<br>1. 分区关系：窄是一对一（确定），宽是按键一对多<br>2. Shuffle：窄没有，宽有<br>3. Stage：窄走同一 Stage 的 pipeline，宽是 Stage 分界<br>4. 失败恢复：窄可局部重算父分区，宽常要重做 Shuffle 段</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">一对一分区</span><span class="keyword-chip">Shuffle</span><span class="keyword-chip">Stage 边界</span><span class="keyword-chip">pipeline</span><span class="keyword-chip">reduceByKey</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：为什么 reduceByKey 通常比 groupByKey 更合适？</h4>
+            <div class="followup-answer"><p>两者都是宽依赖，都要 Shuffle。但 reduceByKey 能在 map 端先局部聚合，再把部分聚合结果 shuffle 出去，网络量和 reduce 端压力都更小。groupByKey 是把同一 key 的全部记录搬到一起再算，倾斜时更容易 OOM。能预聚合就不要先全量聚集。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：Stage 是怎么切出来的？和窄/宽依赖有什么关系？</h4>
+            <div class="followup-answer"><p>从最终 RDD 往回看：一路窄依赖就还在同一个 Stage 里流水；碰到宽依赖就断开，上游成为父 Stage。所以「有几个宽依赖」大致决定「有几个 Shuffle Stage」。调优时先看 Spark UI 的 Stage 边界，比猜算子更准。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>把「有没有 Shuffle」和算子名字死记，忽略已经 co-partition 的 join 可以是窄依赖</li><li>把窄依赖理解成「一定只有一个父 RDD」——union 是窄依赖但有多个父</li><li>只背定义，说不出 Stage 切分和失败恢复的差别</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">窄依赖流水线、宽依赖 Shuffle；Stage 就切在宽依赖上。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

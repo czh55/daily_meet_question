@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>一条 SQL 很慢，你的排查与优化步骤是什么？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-09-17</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#15</span>
+                    <span class="problem-type tag-sql">SQL</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">一条 SQL 很慢，你的排查与优化步骤是什么？</h1>
+                <div class="topic-row"><span class="topic-chip">优化</span><span class="topic-chip">执行计划</span><span class="topic-chip">索引</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>落地能力题。考察有条理的诊断路径，而不是上来就「加索引」。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>复现与量化：多久、多大、是否稳定。</li><li>看执行计划：扫描行数、是否索引、Join 方式。</li><li>改写与结构：谓词下推、避免选*、拆大查询。</li><li>基础设施：统计信息、参数、硬件瓶颈。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>推荐口述顺序：</p>
+<ul><li>确认问题：慢在解析/执行/网络？数据量级？是否只高峰慢？</li><li>EXPLAIN / EXPLAIN ANALYZE：看 type、rows、key、Extra（Using filesort/temporary）、实际耗时</li><li>常见招：</li><li>补合适索引或修正联合索引顺序</li><li>避免索引列函数；改写范围条件</li><li>减小选列、先过滤再 join；子查询改 JOIN</li><li>大 OFFSET 分页改寻键分页</li><li>避免隐式类型转换</li><li>仓场景：保证分区裁剪、减小 shuffle、预聚合</li><li>验证：优化前后对比，关注是否引入正确性风险</li></ul>
+<p>原则：先测量再动手；每次只改一处，保留回滚。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">EXPLAIN</span><span class="keyword-chip">分区剪枝</span><span class="keyword-chip">谓词下推</span><span class="keyword-chip">寻键分页</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：Using filesort 一定坏吗？</h4>
+            <div class="followup-answer"><p>不一定，但大数据量时昂贵。若 ORDER BY 能与索引顺序一致，可消除或减轻。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>不看 explain 直接加索引</li><li>优化时改变了语义（尤其 NULL 与去重）</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">先 EXPLAIN 定位，再针对性改；每次只改一处并验证。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
