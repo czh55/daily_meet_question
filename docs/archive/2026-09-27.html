@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A/B 实验样本量怎么估算？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-09-27</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#25</span>
+                    <span class="problem-type tag-ab">A/B实验</span>
+                    <span class="problem-difficulty difficulty-hard">困难</span>
+                </div>
+                <h1 class="problem-title">A/B 实验样本量怎么估算？</h1>
+                <div class="topic-row"><span class="topic-chip">功效</span><span class="topic-chip">MDE</span><span class="topic-chip">样本量</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>从「知道实验要算人数」进到「能讲清公式依赖哪几个量，以及算少了/算多了分别会怎样」。这是实验设计岗和数据科学交叉的高频追问。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先说目标：在约定 α 和功效下，检出不小于 MDE 的效应。</li><li>列出四个输入：基线、MDE、α、功效（1-β）；比例指标再加方差形态。</li><li>给出可用的口述公式或经验法则，并换算成天数。</li><li>收尾讲现实约束：流量、护栏、方差缩减、不能看到显著就停。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：样本量不是「觉得够了」，而是：在假阳性率 α、漏检率 β 都受控的前提下，若真实提升至少有 MDE 那么大，实验有很大概率能检出来。</p>
+<p>先锁四个数（面试一定要主动问/说）：<br>1. <strong>基线</strong> p：对照组当前转化率或人均指标均值<br>2. <strong>MDE</strong>：你愿意检出的最小相对/绝对提升，由业务成本决定，不是统计软件默认值<br>3. <strong>α</strong>：通常双边 0.05<br>4. <strong>功效 1-β</strong>：常用 80% 或 90%</p>
+<p>比例指标的常用近似（每组人数）：<br><code>n ≈ 2 * (z_{α/2} + z_{β})² * p(1-p) / δ²</code><br>其中 δ 是绝对差。α=0.05、功效 80% 时，<code>(z_{α/2}+z_β)² ≈ 7.85</code>，口算可记 <strong>n ≈ 16σ²/δ²</strong>（两组一共大约 32σ²/δ²）。</p>
+<p>直觉：<br>- 基线越靠近 0 或 1，p(1-p) 越小，同样绝对 δ 更好检；但业务常谈相对提升，低基线要同样相对提升，绝对 δ 更小，人反而要更多<br>- MDE 减半，样本量约变 4 倍<br>- 功效从 80% 提到 90%，人再多一截</p>
+<p>算出每组 n 后，用日均实验流量换天数：<code>天数 = 2n / 日均进入实验的用户数</code>。天数太长就该谈判：放大 MDE、收窄人群、用 CUPED/配对降方差，而不是默默跑半年。</p>
+<p>加分：连续型指标用方差 σ² 替换 p(1-p)；要做 SRM 检查；样本量是「到期再看」的承诺，不是「看到 p&lt;0.05 就停」的许可证。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">MDE</span><span class="keyword-chip">α 与功效</span><span class="keyword-chip">n ≈ 16σ²/δ²</span><span class="keyword-chip">基线转化率</span><span class="keyword-chip">方差缩减</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：转化率只有 1%，想检出相对 5% 的提升，为什么人特别多？</h4>
+            <div class="followup-answer"><p>相对 5% 对应绝对 δ=0.01*0.05=0.0005，δ² 极小。公式分母是 δ²，所以 n 爆炸。这时应重新谈 MDE 是否值得，或先做方差缩减、只在高转化人群实验，而不是硬堆流量。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：CUPED 或分层能少用多少样本？</h4>
+            <div class="followup-answer"><p>方差缩减后，n 近似按 σ² 同比下降。若协变量解释了 30% 方差，样本量大约能少三成。它不改变 MDE 的业务含义，只是让同样的 δ 更好检。不能替代随机分流和预注册。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>把相对提升和绝对差混进公式，δ 用错一个数量级</li><li>不先定 MDE，用「先上线看两天」代替设计</li><li>算出人数后天天偷看、显著就停，第一类错误膨胀</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">先定 MDE 和功效，再倒推人数；MDE 减半，样本大约变四倍。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
