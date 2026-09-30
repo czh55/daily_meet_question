@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>如何用 SQL 计算用户次日留存率？请说清口径与实现思路。 | 每日面试问答</title>
+    <title>Python 垃圾回收机制大致如何工作？ | 每日面试问答</title>
     <link rel="stylesheet" href="../style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,12 +23,12 @@
         <article class="problem-card">
             <header class="problem-header">
                 <div class="problem-meta">
-                    <span class="problem-id">#2</span>
-                    <span class="problem-type tag-sql">SQL</span>
+                    <span class="problem-id">#28</span>
+                    <span class="problem-type tag-python">Python</span>
                     <span class="problem-difficulty difficulty-medium">中等</span>
                 </div>
-                <h1 class="problem-title">如何用 SQL 计算用户次日留存率？请说清口径与实现思路。</h1>
-                <div class="topic-row"><span class="topic-chip">留存</span><span class="topic-chip">用户行为</span><span class="topic-chip">日期对齐</span></div>
+                <h1 class="problem-title">Python 垃圾回收机制大致如何工作？</h1>
+                <div class="topic-row"><span class="topic-chip">GC</span><span class="topic-chip">引用计数</span><span class="topic-chip">循环引用</span><span class="topic-chip">分代回收</span></div>
             </header>
 
             <section class="section">
@@ -37,7 +37,7 @@
                     考察意图
                 </h2>
                 <div class="problem-description">
-                    <p>留存是数据分析最高频指标之一。考察口径意识（按什么算「活跃」、分母是谁）和把业务定义落成可复现 SQL 的能力。</p>
+                    <p>数据/后端岗常问的 CPython 内存基础。考察候选人是否知道「引用计数是主路径、分代循环回收是补丁」，而不是只背一个 gc 模块名；以及能否讲清循环引用、__del__、大对象常驻这些实际坑。</p>
                 </div>
             </section>
 
@@ -47,7 +47,7 @@
                     回答框架
                 </h2>
                 <div class="framework-box">
-                    <ol class="answer-framework"><li>先问清/说清口径：活跃定义、新老用户、时区、是否去重。</li><li>明确分子分母：分母=D0 活跃（或新增）用户集合；分子=其中 D1 仍活跃。</li><li>给出实现路径：先取每日活跃用户表 → 自连接/日期偏移对齐 → 聚合。</li><li>提到常见变体：新增留存 vs 活跃留存、N 日留存、留存曲线。</li></ol>
+                    <ol class="answer-framework"><li>先点明对象：主要讲 CPython，不是语言标准，也不是所有实现。</li><li>主机制：引用计数，对象引用归零立刻释放。</li><li>补机制：分代循环垃圾回收，专门处理互相引用的容器。</li><li>收口到工程：弱引用、__del__ 陷阱、大 DataFrame/缓存如何自己管生命周期。</li></ol>
                 </div>
             </section>
 
@@ -57,22 +57,15 @@
                     参考答案（口述版）
                 </h2>
                 <div class="answer-body">
-                    <p>先定口径（口述时一定要先说，否则数字不可比）：<br>- 活跃：当日有启动 / 有关键事件（需与业务对齐）<br>- 对象：新增用户留存，还是全体活跃用户的次日回访<br>- 日期：自然日还是滚动 24h；时区用业务时区</p>
-<p>经典「新增次日留存」：<br>1. 找出每个用户的首活日 <code>first_date</code><br>2. 找出用户所有活跃日 <code>active_date</code><br>3. 对首活日 = D 的用户，看是否存在 <code>active_date = D+1</code><br>4. 留存率 = 有 D+1 活跃的用户数 / D 日新增用户数</p>
-<p>实现上常用：每日活跃用户去重表 <code>dau(user_id, dt)</code>，再：</p>
-<pre><code>WITH first_day AS (
-  SELECT user_id, MIN(dt) AS d0 FROM dau GROUP BY 1
-)
-SELECT
-  f.d0,
-  COUNT(DISTINCT f.user_id) AS new_users,
-  COUNT(DISTINCT CASE WHEN d.dt = DATE_ADD(f.d0, 1) THEN f.user_id END) AS d1_retained,
-  COUNT(DISTINCT CASE WHEN d.dt = DATE_ADD(f.d0, 1) THEN f.user_id END)
-    * 1.0 / COUNT(DISTINCT f.user_id) AS d1_rate
-FROM first_day f
-LEFT JOIN dau d ON f.user_id = d.user_id
-GROUP BY 1;</code></pre>
-<p>活跃留存则分母改为某日全体活跃用户，分子为次日仍活跃。</p>
+                    <p>一句话：CPython 的回收是「引用计数为主、分代循环 GC 为辅」。引用一归零就释放；互相指着、计数永远到不了零的，交给循环检测。</p>
+<p>引用计数（主路径）：<br>每个对象头里有 <code>ob_refcnt</code>。赋值、入参、进容器会 +1；离开作用域、<code>del</code>、容器丢掉引用会 -1。到 0 立刻调用析构并释放，时延低、实现简单。这就是为什么 <code>a = []</code> 再 <code>a = None</code> 后，那块 list 通常马上没了。</p>
+<p>循环引用（计数的盲区）：</p>
+<pre><code>a, b = [], []
+a.append(b); b.append(a)
+del a, b  # 两个 list 仍互相引用，计数到不了 0</code></pre>
+<p>纯计数收不掉。CPython 用 <code>gc</code> 模块做分代回收：容器对象（list/dict/自定义类实例等）按 0/1/2 三代跟踪，年轻代回收更勤。算法本质是：在追踪集合里找「从外部不可达的环」，把环拆掉再降计数。</p>
+<p>和面试加分相关的几点：<br>1. <code>gc.collect()</code> 可手动触发；生产里很少常开频繁全量收集，更常见的是控制对象图别成环。<br>2. <code>__del__</code> 和环不要混：若环上对象定义了 <code>__del__</code>，CPython 可能不敢随便拆（顺序不确定），对象会进 <code>gc.garbage</code>，形成「看起来像泄漏」。<br>3. 弱引用 <code>weakref</code>：缓存、观察者想「用得到但不延长寿命」时用，避免把缓存变成永生对象。<br>4. 数据场景：Pandas/NumPy 大数组的内存主要在原生缓冲区；Python 侧只是小包装。真正常驻往往是「全局缓存、循环引用的图、未关闭的连接」，不是 GC「太懒」。</p>
+<p>口述收尾：先说 CPython、再说计数 + 循环分代，最后主动提 <code>__del__</code> 环和弱引用，面试官一般就不会再认为你只背了名词。</p>
                 </div>
             </section>
 
@@ -81,7 +74,7 @@ GROUP BY 1;</code></pre>
                     <span class="section-icon">&#x1F50D;</span>
                     关键词
                 </h2>
-                <div class="keyword-row"><span class="keyword-chip">口径</span><span class="keyword-chip">cohort</span><span class="keyword-chip">DAU 去重</span><span class="keyword-chip">DATE_ADD</span><span class="keyword-chip">分子分母</span></div>
+                <div class="keyword-row"><span class="keyword-chip">CPython</span><span class="keyword-chip">引用计数</span><span class="keyword-chip">循环引用</span><span class="keyword-chip">分代回收</span><span class="keyword-chip">弱引用</span></div>
             </section>
 
             <section class="section">
@@ -91,12 +84,12 @@ GROUP BY 1;</code></pre>
                 </h2>
                 <div class="followups">
                     <div class="followup-item">
-            <h4>追问 1：留存率突然下跌，你会怎么排查？</h4>
-            <div class="followup-answer"><p>先核口径与数据质量（埋点、时区、去重）；再切片（渠道/版本/新老/机型）；对照发版与活动；看是否分母膨胀（拉新质量差）还是分子变少（产品体验/崩溃）。</p></div>
+            <h4>追问 1：引用计数已经很快了，为什么还要分代 GC？能关掉吗？</h4>
+            <div class="followup-answer"><p>因为环会让计数永远到不了零，必须另做图可达性分析。<code>gc.disable()</code> 可以关掉循环检测，引用计数仍在；只适合你能保证无环、且想减少 STW 抖动的短命脚本。有环还关 GC，就是人为泄漏。分代是为了少扫老对象：大部分垃圾是朝生夕死的，扫年轻代更划算。</p></div>
         </div>
 <div class="followup-item">
-            <h4>追问 2：为什么有人用「队列留存」而不是「整体次日留存」？</h4>
-            <div class="followup-answer"><p>队列（cohort）按获取日分组，能剥离「用户结构变化」对整体留存的干扰，更适合评估拉新质量与版本影响。</p></div>
+            <h4>追问 2：线上 RSS 只涨不降，一定是 GC 没生效吗？</h4>
+            <div class="followup-answer"><p>不一定。先看是不是还被全局 dict、lru 缓存、默认参数可变对象、循环引用的 handler 抓着；再看是不是原生分配器把页还给 OS 慢（arena 碎片）。<code>gc.collect()</code> 后用 <code>gc.get_objects()</code> / tracemalloc / heapy 看谁还活着。数据任务里更常见的是把大 DataFrame 挂在长生命周期对象上，而不是 GC 坏了。</p></div>
         </div>
                 </div>
             </section>
@@ -107,7 +100,7 @@ GROUP BY 1;</code></pre>
                     常见踩坑
                 </h2>
                 <div class="pitfalls">
-                    <ul class="pitfall-list"><li>分母用注册用户、分子用活跃用户，口径不一致</li><li>同一用户一天多次活跃未去重，导致虚高</li><li>跨时区把「次日」算错</li></ul>
+                    <ul class="pitfall-list"><li>把 GC 说成 Java 那种单一分代收集，漏掉 CPython 引用计数才是主路径</li><li>在循环引用对象上写 __del__，导致环无法回收、内存像泄漏</li><li>把 RSS 不下降全部归咎于 GC，忽略全局缓存和原生内存碎片</li></ul>
                 </div>
             </section>
 
@@ -116,7 +109,7 @@ GROUP BY 1;</code></pre>
                     <span class="section-icon">&#x1F9E0;</span>
                     记忆锚点
                 </h2>
-                <blockquote class="anchor-quote">先对齐口径，再写 SQL；留存本质是两个用户集合的比值。</blockquote>
+                <blockquote class="anchor-quote">CPython：计数负责立刻释放，分代 GC 专门拆环。</blockquote>
             </section>
         </article>
     </main>

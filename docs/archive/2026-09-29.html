@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据写入如何设计幂等？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-09-29</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#27</span>
+                    <span class="problem-type tag-de">数据工程</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">数据写入如何设计幂等？</h1>
+                <div class="topic-row"><span class="topic-chip">幂等</span><span class="topic-chip">重跑</span><span class="topic-chip">UPSERT</span><span class="topic-chip">分区覆盖</span><span class="topic-chip">至少一次</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>数据链路几乎都是至少一次投递：任务会重试、会补数、消息会重复。考察候选人会不会把「同一批次跑一次和跑十次结果一致」设计进写入路径，而不是出事故后再手工删重。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先定义：幂等是「相同输入重复执行，目标状态不变」，不是「少写一次」。</li><li>说清粒度：按消息/请求、按业务主键、按分区日、按批次号，粒度选错就会假幂等。</li><li>给出常用落地：分区覆盖、MERGE/UPSERT、去重表、下游按幂等键。</li><li>补失败收口：半成功怎么回滚或覆盖，迟到数据怎么更新而不叠加。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：幂等写入保证「重试和补跑安全」——同一逻辑键执行一次和执行多次，落地表里的最终状态一样。</p>
+<p>为什么必须做：调度失败重试、上游至少一次、手工回刷历史，都会把同一批数据再送一遍。如果写入是无脑 append，就会重复计数、重复订单、重复推送。</p>
+<p>先定幂等键，再选写入模式：<br>1. 分区覆盖（离线数仓最常用）：目标表按 <code>dt</code>（或 <code>dt+小时</code>）分区，作业对「自己负责的分区」做 <code>INSERT OVERWRITE</code>。同一天重跑只覆盖当天，不影响别的分区。适合可按时间窗完整重算的 T+1 任务。<br>2. 主键 UPSERT / MERGE：明细入湖、维表、状态表常用。按业务主键（订单号、user_id+sku）匹配，有则更新无则插入；不要用自增 id 当幂等键。<br>3. 去重落地：先按幂等键取最新（<code>ROW_NUMBER() OVER (PARTITION BY biz_key ORDER BY updated_at DESC)</code>），再覆盖目标。适合 CDC/日志里同一主键会来多版本。<br>4. 请求级幂等：对外接口或消息消费带 <code>idempotency_key</code> / <code>event_id</code>，先查幂等表再写业务表，写成功才标记完成。Kafka 至少一次 + sink 端按 event_id 去重，是工程里最常见的「近似恰好一次」。</p>
+<p>半成功要有收口：覆盖写要把「写分区」当成原子单元；UPSERT 要可重入；跨多表用事务或「先写可重建的明细、再汇总」。迟到数据用主键更新，而不是再 insert 一行。</p>
+<p>口述收尾：先说「至少一次是常态」，再说「幂等键 + 可覆盖的目标」，最后主动提分区覆盖和 MERGE 两种最常用手段。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">幂等键</span><span class="keyword-chip">分区覆盖</span><span class="keyword-chip">MERGE/UPSERT</span><span class="keyword-chip">至少一次</span><span class="keyword-chip">可重跑</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：至少一次、至多一次、恰好一次分别怎么落地？</h4>
+            <div class="followup-answer"><p>至少一次：重试 + 幂等写入，数据工程默认选这个，丢失比重复更难修。至多一次：失败不重试，会丢数，只适合可容忍缺口的监控旁路。恰好一次：要事务/两阶段提交或源端幂等生产+sink 幂等（如 Kafka idempotent producer + transactional sink），成本和约束都更高。多数数仓日更用「至少一次 + 分区覆盖」就够用。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：分区覆盖和 MERGE 怎么选？迟到数据怎么办？</h4>
+            <div class="followup-answer"><p>能按时间窗完整重算（日更 ODS/DWD）用分区覆盖，语义最简单、回刷最快。目标是当前状态、上游是变更流（订单状态、维表）用 MERGE。迟到数据：覆盖模式把迟到日所在分区重跑；MERGE 模式用业务时间和更新时间取最新版本，禁止对同一主键再插一行。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>把幂等理解成「不要重试」，结果失败就丢数</li><li>用自增主键或写入时间当去重键，重跑会当成新行</li><li>只覆盖一张明细表，下游汇总仍是累加，整条链路并不幂等</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">幂等不是少写一次，是同一键重跑后状态不变。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
