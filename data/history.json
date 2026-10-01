@@ -166,5 +166,11 @@
     "slug": "python-gc",
     "title": "Python 垃圾回收机制大致如何工作？",
     "category": "Python"
+  },
+  {
+    "date": "2026-10-01",
+    "slug": "os-process-thread",
+    "title": "进程和线程的区别？",
+    "category": "计算机基础"
   }
 ]
