@@ -178,5 +178,11 @@
     "slug": "network-http-https",
     "title": "HTTP 和 HTTPS 的区别？TLS 握手了解多少？",
     "category": "计算机基础"
+  },
+  {
+    "date": "2026-10-03",
+    "slug": "bi-cohort-analysis",
+    "title": "什么是队列分析？和普通留存有何不同？",
+    "category": "业务分析"
   }
 ]

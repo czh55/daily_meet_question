@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>什么是队列分析？和普通留存有何不同？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-10-03</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#31</span>
+                    <span class="problem-type tag-biz">业务分析</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">什么是队列分析？和普通留存有何不同？</h1>
+                <div class="topic-row"><span class="topic-chip">队列分析</span><span class="topic-chip">留存</span><span class="topic-chip">用户分群</span><span class="topic-chip">结构效应</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>留存是数据岗最高频指标之一，但这题考的不是会不会算次日留存，而是候选人是否理解「整体留存会被用户结构带节奏」。面试官想听：队列如何把同一批人钉住、和普通留存差在哪、什么时候必须拆队列，而不是只报一个大盘数字。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先给定义：队列（cohort）是同一时期、经历同一关键事件的一批人，跟踪这批人后续行为。</li><li>对比普通/整体留存：整体是「当天所有活跃用户混在一起」；队列是「同一批人往后看」。</li><li>点破差异的本质：结构效应——人变了，整体会动；队列没动，说明产品对老用户未必变差。</li><li>落地讲法：怎么建队列、怎么读热力图、怎么用来评估渠道/版本/活动。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：队列分析是把用户按「何时、因何事进入观察」切成一批一批，然后看这同一批人在第 1 天、第 7 天、第 30 天还在不在；普通留存（整体次日/周留存）则是把当天所有人搅在一个锅里算回访率。</p>
+<p>队列（cohort / 同期群）最常见的切法是<strong>获取队列</strong>：同一天（或同一周）新注册 / 首活 / 首单的用户算一批。也可以做<strong>行为队列</strong>：同一周完成了「第一次加购」「第一次看完课」的人算一批。关键不是日期本身，而是「进入队列的事件对齐」——这批人的「第 0 天」是同一类事件。</p>
+<p>普通留存在算什么：D 日活跃用户里，有多少人在 D+1 还活跃。分母每天都在换人。新渠道灌进来一波低质量用户、活动把羊毛党冲进来、某天大盘里老用户占比突然变高，整体次日留存都会跳，哪怕你对「上周那批新用户」什么都没改。</p>
+<p>队列留存在算什么：对「9 月 1 日新增」这一批人，看他们自己的 D1 / D7 / D30。9 月 2 日新增是另一行。热力图的一行是一个队列，一列是存活天数。这样你比较的是「同一批人随时间的衰减」，不是「今天这锅汤咸不咸」。</p>
+<p>为什么必须拆：<br>1. 结构效应（composition）：整体留存掉了，先问是「老队列也掉」还是「新进来的人更差」。后者是拉新质量/渠道问题，前者才更像产品或体验衰退。<br>2. 评估干预：发版、改注册流程、换激励，应对「干预后的新队列」看曲线，而不是拿大盘和上周比——大盘里大部分人根本没碰到新流程。<br>3. 渠道 / 活动复盘：同一产品，应用商店、信息流、线下地推的队列曲线往往差一截；只看整体会被占比最大的渠道淹没。</p>
+<p>实现上，先有一张用户日活去重表 <code>dau(user_id, dt)</code>，再钉住进入日：</p>
+<pre><code>WITH cohort AS (
+  SELECT user_id, MIN(dt) AS cohort_dt
+  FROM dau
+  GROUP BY 1
+),
+labeled AS (
+  SELECT
+    c.cohort_dt,
+    DATEDIFF(d.dt, c.cohort_dt) AS day_n,
+    d.user_id
+  FROM cohort c
+  JOIN dau d ON d.user_id = c.user_id
+            AND d.dt &gt;= c.cohort_dt
+)
+SELECT
+  cohort_dt,
+  COUNT(DISTINCT CASE WHEN day_n = 0 THEN user_id END) AS size,
+  COUNT(DISTINCT CASE WHEN day_n = 1 THEN user_id END) * 1.0
+    / COUNT(DISTINCT CASE WHEN day_n = 0 THEN user_id END) AS d1,
+  COUNT(DISTINCT CASE WHEN day_n = 6 THEN user_id END) * 1.0
+    / COUNT(DISTINCT CASE WHEN day_n = 0 THEN user_id END) AS d7
+FROM labeled
+GROUP BY 1;</code></pre>
+<p>口径要先对齐：分母是队列人数（D0 那批），分子是这批人里第 N 天仍活跃的人数；活跃定义、时区、自然日还是滚动 24h，必须和整体留存用同一套，否则两张图不能对读。</p>
+<p>口述收尾：先说「队列钉住同一批人，整体混着看」；再主动提「整体掉了先拆结构，别急着判产品变差」。面试官一般会顺着问热力图或渠道。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">同期群</span><span class="keyword-chip">结构效应</span><span class="keyword-chip">获取队列</span><span class="keyword-chip">D1/D7</span><span class="keyword-chip">热力图</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：整体次日留存掉了，但最近几周的新队列 D1 没掉，说明什么？</h4>
+            <div class="followup-answer"><p>优先怀疑结构，而不是产品突然变差。常见原因：老用户活跃在衰减、大盘里新用户占比升高（新用户 D1 天然低于老用户次日回访）、或某条差渠道量上来了但还没反映到「最近队列」的口径（比如你看的是周队列、掉的是日整体）。下一步：按新老、渠道、版本切整体，并核对分母有没有被活动/刷量撑大。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：获取队列和行为队列怎么选？</h4>
+            <div class="followup-answer"><p>问「这批人从哪来、质量如何」用获取队列（注册日/首活日/首单日）。问「完成了某个关键动作的人，后续是否更留得住」用行为队列（首次加购、首次发布、首次付费）。行为队列的 D0 是该事件日，不是注册日，别和新增留存混报。评估某次改版对「新进来的人」的影响，用改版后的获取队列；评估「已经会用核心功能的人」是否更粘，用行为队列。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：队列热力图怎么读？一行一列分别是什么？</h4>
+            <div class="followup-answer"><p>一行一个队列（通常按获取日/周），一列是存活期（D0、D1、D7…），格子是该队列在该天的留存率。横着看是一条衰减曲线；竖着看同一存活期、不同队列，用来比「这周新用户是不是不如上周」。读图时先看样本量：队列太小（几十人）的波动不要当趋势。还要注意右下角是「还没活到那天」的空窗，不是留存为 0。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>把整体次日留存直接叫队列留存，分母每天在换人却当同一批</li><li>队列的活跃定义、时区、自然日和整体留存不一致，两张图对不上还硬解释</li><li>小样本队列（活动日、小渠道）把噪声当成渠道质量差异</li><li>只报 D1，不看曲线形状——有的渠道 D1 高、D7 塌，是激励羊毛不是真留存</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">整体留存混着看；队列把同一批人钉住，才能分清是产品变差还是人变了。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
