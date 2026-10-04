@@ -184,5 +184,11 @@
     "slug": "bi-cohort-analysis",
     "title": "什么是队列分析？和普通留存有何不同？",
     "category": "业务分析"
+  },
+  {
+    "date": "2026-10-04",
+    "slug": "ml-bias-variance",
+    "title": "偏差-方差权衡是什么？如何诊断过拟合？",
+    "category": "机器学习基础"
   }
 ]
