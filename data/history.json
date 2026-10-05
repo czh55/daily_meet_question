@@ -190,5 +190,11 @@
     "slug": "ml-bias-variance",
     "title": "偏差-方差权衡是什么？如何诊断过拟合？",
     "category": "机器学习基础"
+  },
+  {
+    "date": "2026-10-05",
+    "slug": "sql-cte",
+    "title": "CTE 是什么？和子查询比有什么好处？",
+    "category": "SQL"
   }
 ]

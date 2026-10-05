@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTE 是什么？和子查询比有什么好处？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-10-05</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#33</span>
+                    <span class="problem-type tag-sql">SQL</span>
+                    <span class="problem-difficulty difficulty-easy">简单</span>
+                </div>
+                <h1 class="problem-title">CTE 是什么？和子查询比有什么好处？</h1>
+                <div class="topic-row"><span class="topic-chip">CTE</span><span class="topic-chip">WITH</span><span class="topic-chip">子查询</span><span class="topic-chip">可读性</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>这题看起来像语法题，面试官真正听的是：你会不会把复杂 SQL 拆成可命名的中间结果，而不是把三层子查询嵌成一坨。还要能说清 CTE 不是「一定更快」，以及递归 CTE 解决什么问题。只会背 WITH 关键字，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先定义：CTE 是 WITH 声明的、有名字的临时结果集，只在当前语句里存活。</li><li>对比子查询：同样能嵌套计算，但 CTE 可复用、可分层读，子查询嵌深就难维护。</li><li>举业务例子：先筛有效订单，再聚合，外层再排名——每步一个 CTE。</li><li>收尾补边界：性能看优化器，别神话；组织树 / 账单链路才上递归 CTE。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：CTE（Common Table Expression）就是用 <code>WITH</code> 给中间结果起个名字，后面像用一张临时表一样引用它。它不是物理落表，默认只在这一条 SQL 里有效。</p>
+<p>和子查询比，能力上经常等价：都能先算出一块，再被外层用。差别主要在<strong>怎么写、怎么复用、怎么给别人读</strong>。</p>
+<p>子查询的痛点是「从里往外抠」：里层改了口径，外层三个地方都要跟着改；同一段逻辑写两遍还容易口径漂。CTE 把步骤摊平：</p>
+<pre><code>WITH paid AS (
+  SELECT user_id, amount, order_date
+  FROM orders
+  WHERE status = 'paid'
+),
+user_gmv AS (
+  SELECT user_id, SUM(amount) AS gmv
+  FROM paid
+  GROUP BY user_id
+)
+SELECT user_id, gmv
+FROM user_gmv
+WHERE gmv &gt;= 1000;</code></pre>
+<p>好处我面试里会主动报三句：<br>1. <strong>可读</strong>：从上往下读，像 ETL 步骤，而不是括号套括号。<br>2. <strong>复用</strong>：同一个 CTE 可以被后面多个 CTE / 主查询引用，避免复制粘贴子查询。<br>3. <strong>调试</strong>：可以先 <code>SELECT * FROM paid</code> 单独看中间层（或注释掉后面），比拆嵌套子查询快。</p>
+<p>性能不要神话：多数引擎会把 CTE 内联成等价计划，<strong>不一定比子查询快，也不一定物化</strong>。有的引擎（早期 PostgreSQL）可能多次引用就计算多次。该不该用 CTE，先看结构清不清楚，再看执行计划。</p>
+<p>比普通 CTE 再往上一步是<strong>递归 CTE</strong>（<code>WITH RECURSIVE</code>）：组织树找全部下级、账单找父单链路、图上有限深度遍历。这是子查询不好写、自连接叠 N 次也盖不住的场景。</p>
+<p>口述收尾：先说「CTE 是给中间结果起名」；再说「和子查询比的是可读和复用，不是稳赢性能」；有余力补「层级结构用递归 CTE」。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">WITH</span><span class="keyword-chip">中间结果</span><span class="keyword-chip">可读性</span><span class="keyword-chip">复用</span><span class="keyword-chip">递归 CTE</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：CTE 和临时表 / 视图有什么区别？什么时候该落表？</h4>
+            <div class="followup-answer"><p>CTE 只活在这一条语句里，不占目录、默认不持久。临时表是会话级对象，可以建索引、被多条 SQL 复用，适合中间结果很大、后面要反复扫。视图是目录里的命名查询，给多人复用，但改定义会影响所有调用方。中间结果只服务当前查询 → CTE；要复用、要加索引、要分步跑作业 → 临时表或中间层物理表。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：递归 CTE 怎么停下来？会不会死循环？</h4>
+            <div class="followup-answer"><p>递归 CTE 分锚点成员（第一层）和递归成员（引用自身往下扩）。终止靠「递归成员不再产出新行」，或者数据库的递归深度上限。图里有环必须自己去重：用路径字段判断节点已出现，或 <code>UNION</code>（去重）而不是 <code>UNION ALL</code>。面试里要主动说：树用递归 CTE，网状关系没防环就会炸。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：同一个 CTE 被引用两次，一定只算一遍吗？</h4>
+            <div class="followup-answer"><p>不保证。优化器可能内联成两份，也可能物化一次。所以「CTE 一定更快」是错的。多次引用且计算很重时，要看执行计划；需要稳定算一次就显式落临时表或中间表。MySQL 8、Presto/Hive、SparkSQL 行为也不完全一样，跨引擎别想当然。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>把 CTE 说成一定比子查询快——多数时候只是写法不同</li><li>以为 CTE 会落成一张真表，后面会话还能查到</li><li>递归 CTE 遇到有环的关系却不防环，跑到深度上限或把行打爆</li><li>把所有逻辑塞进一个巨型 CTE，可读性和子查询一样差</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">CTE 是给中间结果起名，赢在可读和复用，不保证更快。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
