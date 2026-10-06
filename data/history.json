@@ -196,5 +196,11 @@
     "slug": "sql-cte",
     "title": "CTE 是什么？和子查询比有什么好处？",
     "category": "SQL"
+  },
+  {
+    "date": "2026-10-06",
+    "slug": "dw-surrogate-key",
+    "title": "代理键和自然键怎么选？",
+    "category": "数仓建模"
   }
 ]

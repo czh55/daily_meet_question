@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>代理键和自然键怎么选？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-10-06</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#34</span>
+                    <span class="problem-type tag-dw">数仓建模</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">代理键和自然键怎么选？</h1>
+                <div class="topic-row"><span class="topic-chip">代理键</span><span class="topic-chip">自然键</span><span class="topic-chip">维度表</span><span class="topic-chip">SCD</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>这题考的不是「主键用自增还是业务 ID」的口号，而是候选人有没有在数仓里处理过「业务键会变、同一实体会有多版本」。面试官想听：自然键从哪来、代理键解决什么、和 SCD Type2 / 事实表关联怎么配。只说「用自增更稳」却说不清历史行，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先定义：自然键是业务里已经能认出这一行的键（sku_code、订单号）；代理键是仓里生成、无业务含义的稳定主键。</li><li>点破数仓痛点：自然键会改、会复合、会复用；SCD Type2 还要求「同一自然键多行并存」。</li><li>讲配合方式：维度用代理键当 PK，自然键当属性；事实表存代理键做 JOIN，必要时再冗余自然键方便排查。</li><li>选型收口：OLTP 跟业务唯一约束；数仓维度优先代理键。补一句生成策略（序列 / hash）和变更怎么处理。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：自然键是业务世界认人的身份证，代理键是数仓自己发的工号；分析仓里维度表主键优先用工号，身份证留下当属性，别拿去扛历史版本和关联。</p>
+<p><strong>自然键（natural key）</strong>：来自源系统、有业务含义。商品货号、手机号、身份证、<code>user_id@source</code>、复合键 <code>(org_id, emp_no)</code>。好处是人能读、对账方便。坏处在仓里会被放大：业务改编码、合并账号、空值、大小写空格、源系统复用旧号，主键就漂了；复合键让事实表外键又宽又脆。</p>
+<p><strong>代理键（surrogate key）</strong>：仓内生成，通常整型序列或稳定 hash，<strong>没有业务含义</strong>。维度表一行一个代理键。事实表存这个键去 JOIN 维度，不直接拿业务键当事实-维度外键。</p>
+<p>数仓为什么更爱代理键，我面试会主动报三件事：<br>1. <strong>业务键会变</strong>：手机号换了、SKU 重编码、CRM 合并客户。自然键当 PK，历史事实对不上，还得级联改。代理键不变，自然键只是一列属性，改属性就行（或走 SCD）。<br>2. <strong>同一实体多版本</strong>：SCD Type2 要保留「当时部门 / 当时类目」，同一 <code>sku_code</code> 会有多行。自然键不能再当唯一主键，必须 <code>dim_sku_sk</code> 一行一版本，自然键 + 生效区间当业务查找键。<br>3. <strong>JOIN 又窄又稳</strong>：事实表挂一个 bigint，比挂一串复合业务键更省、更不容易因为空格/类型隐式转换把关联打空。</p>
+<p>落地长什么样：</p>
+<pre><code>-- 维度：代理键是 PK，自然键是属性
+CREATE TABLE dim_sku (
+  sku_sk        BIGINT PRIMARY KEY,  -- 代理键
+  sku_code      STRING,              -- 自然键
+  sku_name      STRING,
+  category      STRING,
+  start_dt      DATE,
+  end_dt        DATE,
+  is_current    INT
+);
+
+-- 事实：存代理键关联「下单当时」的维度版本
+SELECT f.gmv, d.category
+FROM fct_order f
+JOIN dim_sku d
+  ON f.sku_sk = d.sku_sk;</code></pre>
+<p>ETL 时用自然键去维度找当前版（或按事件时间命中生效区间）拿到 <code>sku_sk</code>，再写入事实——这就是所谓 <strong>key lookup / 代理键换入</strong>。</p>
+<p>选型别一刀切：<br>- <strong>源系统 / OLTP</strong>：跟业务唯一约束，常用自然键或业务 ID，保证幂等写入。<br>- <strong>数仓维度</strong>：默认代理键 PK；自然键必留，用于对账、排错、回刷。<br>- <strong>事实表</strong>：关联用代理键；订单号这类「几乎没属性」的标识可以当退化维度直接放事实表，不必硬做一张空维度。<br>- 代理键生成：日批维度用序列/雪花 ID 简单；跨集群、晚到数据要对齐同一版本，可用 <code>hash(natural_key)</code> 或 <code>hash(natural_key + start_dt)</code>，但要处理碰撞和大小写规范化。</p>
+<p>口述收尾：先说「仓里用代理键扛稳定关联和历史版本，自然键当属性」；再主动提「Type2 同一自然键多行，所以自然键当不了 PK」。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">代理键</span><span class="keyword-chip">自然键</span><span class="keyword-chip">SCD Type2</span><span class="keyword-chip">key lookup</span><span class="keyword-chip">稳定主键</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：SCD Type2 和代理键是什么关系？能不能继续用自然键当主键？</h4>
+            <div class="followup-answer"><p>不能。Type2 是「同一业务实体、多行历史」，自然键不再唯一。主键必须是代理键（或自然键+生效时间的复合键）。事实表若用自然键去 JOIN 维度且不加时间条件，会把一个订单打成多个版本，指标翻倍。正确做法：装载事实时按事件时间命中维度生效区间，把当时那一行的代理键写进事实；之后 JOIN 只走代理键，不再按自然键炸。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：手机号、邮箱当用户主键行不行？业务键变了怎么处理？</h4>
+            <div class="followup-answer"><p>当自然键属性可以，当仓内主键不行。手机号会换、会空、会被新用户复用。变了就改维度上的属性列（Type1），或加一版 Type2 保留「当时手机号」；代理键始终指向同一个人。还要有一个真正稳定的业务号（注册 ID、会员号）。没有稳定业务号时，仓内仍用代理键，并用映射表记下「哪些自然键曾经指向这个人」，避免对账对飞。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：代理键用自增还是 hash？事实表要不要冗余一份自然键？</h4>
+            <div class="followup-answer"><p>自增/序列：短、JOIN 快、保证唯一，但依赖中心发号，补数、多集群、重跑要对齐比较烦。hash(自然键)：可复现、晚到数据也能算出同一个键，但要规范化（trim、大小写）、防碰撞，Type2 还得把版本时间编进 hash 或仍用序列区分版本。事实表建议冗余自然键：JOIN 走代理键保证正确，排错、对账、维度还没换入成功时能看见货号。不要只存自然键当关联键。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>拿手机号、邮箱、会被回收的业务号当维度主键</li><li>Type2 后仍用自然键 JOIN 事实，造成一对多、指标翻倍</li><li>以为代理键有业务含义，报表直接展示 SK，源系统对不上</li><li>维度不保留自然键，出了事故无法对账、无法按货号回刷</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">数仓用代理键扛关联和历史版本；自然键留下当属性，别当主键。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
