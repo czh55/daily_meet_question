@@ -202,5 +202,11 @@
     "slug": "dw-surrogate-key",
     "title": "代理键和自然键怎么选？",
     "category": "数仓建模"
+  },
+  {
+    "date": "2026-10-07",
+    "slug": "realtime-vs-batch",
+    "title": "实时数仓和离线数仓如何分工与统一口径？",
+    "category": "数据工程"
   }
 ]

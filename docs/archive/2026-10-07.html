@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时数仓和离线数仓如何分工与统一口径？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-10-07</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#35</span>
+                    <span class="problem-type tag-de">数据工程</span>
+                    <span class="problem-difficulty difficulty-hard">困难</span>
+                </div>
+                <h1 class="problem-title">实时数仓和离线数仓如何分工与统一口径？</h1>
+                <div class="topic-row"><span class="topic-chip">实时数仓</span><span class="topic-chip">离线数仓</span><span class="topic-chip">口径</span><span class="topic-chip">对账</span><span class="topic-chip">迟到数据</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>这题考的不是「实时用 Flink、离线用 Hive」的组件清单，而是候选人有没有在生产里处理过「两套仓、两套数、业务对不上」。面试官想听：按 SLA 和完整性怎么分工、口径谁说了算、迟到数据怎么收口、实时数怎么被离线校准。只背 Lambda/Kappa 却说不清对账，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先按 SLA 切，不按引擎切：离线求完整可复现，实时求低延迟可操作。</li><li>讲分工：哪些必须进实时（风控、库存、运营大屏），哪些必须离线当真相（结算、复盘、正式指标）。</li><li>统一口径：同一份指标说明书（粒度/时区/去重键/关联维），实时是带新鲜度的估计，离线是终态。</li><li>收口对账：双跑、水位、分区覆盖回刷；差多少算事故、差在主键还是窗口。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：实时仓负责「现在能不能动手」，离线仓负责「账能不能对上」；口径只认一份说明书，数字以离线终态校准，实时数带过期时间，不当结算真相。</p>
+<p>先把两个仓从 SLA 上拆开，而不是从技术栈拆开。<br>- <strong>离线数仓</strong>：T+1（或小时批），要完整、可重跑、可审计。适合结算、日报、归因、训练样本、正式经营分析。贵的是正确和可复现，不贵在秒级。<br>- <strong>实时数仓</strong>：秒到分钟级，允许短暂不完整。适合风控、库存、实时运营大屏、推荐近线特征。贵的是延迟，完整度用水位和校准补。</p>
+<p>分工口诀：<strong>能等的进离线，等不起且容错得起的进实时</strong>。GMV 复盘、分成结算、漏斗归因走离线；「库存是不是卖超了」「大盘是不是在掉」走实时。同一指标可以两套产出，但必须声明「这是实时快照，T+1 以离线为准」。</p>
+<p>架构上常见三条路，面试按约束选，别背名词：<br>1. <strong>Lambda</strong>：实时一条流、离线一条批，对外两套表，批任务回刷实时结果。实现快，口径最容易漂，必须强制同一份指标定义。<br>2. <strong>Kappa</strong>：以流为主，历史也重放流。链路短，但「全量重放 + 维表变更 + 迟到」成本高，批校准仍然常在。<br>3. <strong>流批一体 / 同一套计算</strong>：一份 SQL/同一套算子，批是流的有界执行。口径最容易对齐，工程门槛在引擎和维表时效。</p>
+<p>口径怎么统一，我面试会主动报四件事：<br>1. <strong>一份指标说明书</strong>：业务主键、时间字段（事件时间不是处理时间）、时区、去重键、成功态定义（下单 vs 支付成功）、维表取「当时」还是「当前」。实时和离线都引用这一份，禁止各写各的 CASE WHEN。<br>2. <strong>同一粒度对账</strong>：不要拿实时「当前累计」去比离线「日分区求和」却不声明窗口。对账键至少到 <code>dt + biz_key</code>，先比主键差集，再比金额。<br>3. <strong>迟到与水位</strong>：实时按 event time + watermark 关窗；关窗后的迟到进侧输出或等离线覆盖。离线按分区完整重算，天然吃得下迟到。<br>4. <strong>校准策略</strong>：实时结果带 <code>as_of</code> / 新鲜度；离线分区就绪后 <strong>覆盖</strong> 同一业务键（不是再累加一行）。看板要写清「数据截至 xx:xx」。</p>
+<p>落地长这样：</p>
+<pre><code>-- 离线终态：按日分区覆盖，作为对账真相
+INSERT OVERWRITE TABLE ads_gmv PARTITION (dt='2026-10-06')
+SELECT order_id, user_id, pay_amt, pay_time
+FROM dwd_pay_success
+WHERE dt='2026-10-06';
+
+-- 对账：先找集合差，再比金额（示例）
+SELECT
+  COUNT(DISTINCT CASE WHEN r.order_id IS NULL THEN o.order_id END) AS only_offline,
+  COUNT(DISTINCT CASE WHEN o.order_id IS NULL THEN r.order_id END) AS only_realtime,
+  SUM(o.pay_amt) - SUM(r.pay_amt) AS amt_diff
+FROM ads_gmv o
+FULL OUTER JOIN ads_gmv_rt r
+  ON o.dt = r.dt AND o.order_id = r.order_id
+WHERE o.dt = '2026-10-06';</code></pre>
+<p>口述收尾：先说 SLA 分工，再说「一份说明书 + 离线覆盖校准」，最后主动提对账看主键差集。这样面试官不会觉得你只是把实时和离线当成两个集群。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">SLA 分工</span><span class="keyword-chip">指标说明书</span><span class="keyword-chip">流批对账</span><span class="keyword-chip">watermark</span><span class="keyword-chip">离线校准</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：Lambda、Kappa、流批一体怎么选？是不是必须上实时数仓？</h4>
+            <div class="followup-answer"><p>先问延迟能不能用小时批或微批扛住。能的话不要上实时，运维和对账成本通常高于引擎本身。延迟必须秒到分钟、且业务能接受短暂偏差，再上实时。Lambda 适合离线已经很成熟、要快速加一条实时旁路，但要配强制对账。Kappa 适合事件流已经是事实来源、重放成本可接受。流批一体适合新栈、指标还没漂、团队能守住同一套定义。无论哪条路，离线（或可重放的完整重算）都要能当终态，不能把实时当成唯一真相。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：实时 GMV 比离线高 3%，你怎么排查？</h4>
+            <div class="followup-answer"><p>先冻结口径：支付成功还是下单、是否含退款、时区、是否去重。再按主键做 FULL OUTER JOIN：只在实时的多半是重复消费、状态回拨当成新单、或把未支付算进去；只在离线的多半是水位关早了、维表关联把实时行打丢、或实时过滤了测试号离线没滤。金额差但订单对得上，看是否用了不同汇率/优惠分摊。维表要核对：实时用当前维、离线用下单当时维，类目一变 GMV 就会漂。最后看窗口：实时是「当天 0 点到 now」，离线是「自然日完整分区」，对账必须对齐同一 as_of。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：迟到数据和维度变更，实时侧怎么收口？</h4>
+            <div class="followup-answer"><p>迟到：事件时间 + watermark，关窗后进侧输出，由补偿作业写回或等离线覆盖，禁止静默丢。超大迟到（跨天）不要在实时里无限开窗，交给离线分区重跑。维度变更：事实取「事件发生时」的维度版本（as-of join / 维表打时间），不要拿最新维去改写历史实时点。维表本身也要有实时版本和离线 SCD，对账时声明用的是哪一版。实时任务要幂等：按业务主键 UPSERT，不能因为迟到再 insert 一行把 GMV 加两次。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>两套 SQL 各写各的 CASE WHEN，指标名一样、口径已经不是一个东西</li><li>把实时数直接用于结算、分成、对客账单</li><li>实时窗口用处理时间，重启或反压后「今天的数」会整段错位</li><li>对账只比总数不比主键差集，3% 的差被「差不多」糊过去</li><li>实时 append、离线覆盖，校准的时候又累加一次，数翻倍</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">实时负责快，离线负责对；口径只认一份说明书，数字以离线终态校准。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
