@@ -1490,5 +1490,56 @@
       "离线校准"
     ],
     "anchor": "实时负责快，离线负责对；口径只认一份说明书，数字以离线终态校准。"
+  },
+  {
+    "id": 36,
+    "slug": "spark-broadcast-join",
+    "title": "Spark 里 Broadcast Join 和 Shuffle Join 有什么区别？怎么选？",
+    "category": "大数据计算",
+    "difficulty": "中等",
+    "topics": [
+      "Broadcast Join",
+      "Shuffle Join",
+      "AQE",
+      "数据倾斜",
+      "小表广播"
+    ],
+    "ready": true,
+    "intent": "这题考的不是背两个 Join 名字，而是候选人有没有在生产里为「大表关联维表 / 大表关联大表」选过执行计划。面试官想听：Shuffle 为什么贵、广播为什么能省、表多大能广播、倾斜和 AQE 怎么接。只说「小表用 broadcast」却说不清 Driver 内存、副本和空值倾斜，这题就浅了。",
+    "framework": [
+      "先对比代价：Shuffle Join 两边按 join key 分区交换；Broadcast Join 把小表复制到每个 Executor，大表本地关联、不 Shuffle 大表。",
+      "讲适用边界：小表能放进广播阈值和 Executor 内存才广播；两边都大、或小表其实不小，走 Shuffle / Sort-Merge。",
+      "主动提计划怎么出来：hint、spark.sql.autoBroadcastJoinThreshold、AQE 运行中改计划。",
+      "收口风险：Driver 收集小表 OOM、倾斜、空 key、广播超时；大表关联大表别硬广播。"
+    ],
+    "answer": "一句话：Shuffle Join 是「两边都按键搬家再对齐」；Broadcast Join 是「小表复印一份送到每个 Executor，大表原地关联」。能广播就别让大表 Shuffle；不能塞进内存就老老实实 Shuffle，别硬广播把 Driver 打爆。\n\n**Shuffle Join（常见是 Sort-Merge Join）**：两张表都按 join key 做 Shuffle，相同 key 落到同一分区，再排序合并。代价是网络、磁盘溢写、Stage 切分。适合两边都大，或者小表其实已经超过广播阈值。\n\n**Broadcast Hash Join**：Driver 把小表 collect 成哈希表，广播到每个 Executor；大表每个 partition 本地 probe，**大表不 Shuffle**。省的是大表那一次全量交换。Spark SQL 里小表低于 `spark.sql.autoBroadcastJoinThreshold`（默认常见 10MB）会自动广播，也可以 `/*+ BROADCAST(d) */` 强制。\n\n我面试会按「谁搬家」讲选型：\n1. **事实表很大、维度很小**（城市码表、配置、活动名单）：Broadcast。这是数仓里最常见的星型关联。\n2. **两边都是大事实、或维表已经上 GB**：Shuffle / SMJ。硬广播会把 Driver 和每个 Executor 的堆打满。\n3. **一边中等、统计过期**：别死盯阈值。AQE（`spark.sql.adaptive.enabled`）可以在运行中看真实大小，把本来的 SMJ 改成 Broadcast，或把倾斜分区拆开。\n4. **join key 倾斜**：广播解决不了「一个 key 占 80%」——大表那个分区本地哈希还是爆。要先打散/加盐，或让 AQE 拆倾斜分区；空字符串、`unknown` 当 key 等于人为制造一个超热 key。\n\n落地长这样：\n```sql\n-- 维表明确很小：强制广播，避免统计不准走了 SMJ\nSELECT /*+ BROADCAST(d) */\n  f.order_id, f.gmv, d.city_name\nFROM fct_order f\nJOIN dim_city d\n  ON f.city_id = d.city_id;\n\n-- 两边都大：不要 BROADCAST，让优化器走 SMJ\nSELECT /*+ SHUFFLE_MERGE(a, b) */\n  a.user_id, b.sku_id\nFROM fct_click a\nJOIN fct_order b\n  ON a.user_id = b.user_id\n AND a.dt = b.dt;\n```\n\n口述收尾：先说「小表复印、大表不搬家」；再主动报阈值、Driver 内存和倾斜。面试官要的是你会看计划，不是会背 hint 单词。",
+    "followups": [
+      {
+        "q": "广播阈值怎么定？10MB 是不是越大越好？",
+        "a": "默认 10MB 是保守值，指的是广播表的计划大小，不是源表文件大小。调大能让更多维表走 BHJ，但 Driver 要 collect、每个 Executor 要各持一份副本。Executor 堆 4g、同时 8 个 task 复用一份广播还好；若小表其实 800MB，100 个 Executor 就复制了几十 GB 的堆外/堆内压力，GC 和广播超时会先爆。经验：单表广播控制在「远小于 Executor 内存的一小截」，多张维表要加总。超过就 SMJ。调阈值前先看 Spark UI 的 Broadcast 大小和 Driver 内存。"
+      },
+      {
+        "q": "AQE 和 Broadcast Join 是什么关系？hint 还要不要写？",
+        "a": "AQE 在 Shuffle 写完后能看到真实分区大小，可能把 SMJ 改成 BHJ，也可能拆倾斜分区。统计过期、动态分区裁剪后表变小时，AQE 很有用。hint 仍然要：SLA 紧、维表确定很小、你不能赌统计——直接 BROADCAST。两边都大就 SHUFFLE_MERGE，防止 AQE 误广播。AQE 不是替代判断，是给「运行中才知道大小」兜底。"
+      },
+      {
+        "q": "Broadcast Join 还会 OOM 或变慢吗？和数据倾斜怎么一起答？",
+        "a": "会。Driver collect 小表时 OOM；Executor 上广播表 + 当前分区哈希表叠加 OOM；广播文件超时任务反复拉。倾斜时：即便走了 BHJ，大表热 key 那个 partition 仍然巨大，本地 join 照样慢/爆。处理是两层：表级选 BHJ 还是 SMJ；key 级加盐、过滤空 key、AQE skew join。不要把「开了 broadcast」当成倾斜已经治好。"
+      }
+    ],
+    "pitfalls": [
+      "把「小表」理解成行数少，忽略列很宽、字符串很大，10 万行也能有几百 MB",
+      "维表其实上 GB 仍写 BROADCAST，Driver collect 直接 OOM",
+      "以为广播能治数据倾斜，热 key 在大表分区里照样爆",
+      "统计信息过期导致该广播没广播、不该广播被广播，却不去看 Spark UI 的实际计划"
+    ],
+    "keywords": [
+      "Broadcast Hash Join",
+      "Sort-Merge Join",
+      "autoBroadcastJoinThreshold",
+      "AQE",
+      "大表不 Shuffle"
+    ],
+    "anchor": "小表能进内存就广播，让大表别搬家；两边都大或会把 Driver 打爆，就走 Shuffle。"
   }
 ]

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spark 里 Broadcast Join 和 Shuffle Join 有什么区别？怎么选？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-10-08</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#36</span>
+                    <span class="problem-type tag-bigdata">大数据计算</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">Spark 里 Broadcast Join 和 Shuffle Join 有什么区别？怎么选？</h1>
+                <div class="topic-row"><span class="topic-chip">Broadcast Join</span><span class="topic-chip">Shuffle Join</span><span class="topic-chip">AQE</span><span class="topic-chip">数据倾斜</span><span class="topic-chip">小表广播</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>这题考的不是背两个 Join 名字，而是候选人有没有在生产里为「大表关联维表 / 大表关联大表」选过执行计划。面试官想听：Shuffle 为什么贵、广播为什么能省、表多大能广播、倾斜和 AQE 怎么接。只说「小表用 broadcast」却说不清 Driver 内存、副本和空值倾斜，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先对比代价：Shuffle Join 两边按 join key 分区交换；Broadcast Join 把小表复制到每个 Executor，大表本地关联、不 Shuffle 大表。</li><li>讲适用边界：小表能放进广播阈值和 Executor 内存才广播；两边都大、或小表其实不小，走 Shuffle / Sort-Merge。</li><li>主动提计划怎么出来：hint、spark.sql.autoBroadcastJoinThreshold、AQE 运行中改计划。</li><li>收口风险：Driver 收集小表 OOM、倾斜、空 key、广播超时；大表关联大表别硬广播。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：Shuffle Join 是「两边都按键搬家再对齐」；Broadcast Join 是「小表复印一份送到每个 Executor，大表原地关联」。能广播就别让大表 Shuffle；不能塞进内存就老老实实 Shuffle，别硬广播把 Driver 打爆。</p>
+<p><strong>Shuffle Join（常见是 Sort-Merge Join）</strong>：两张表都按 join key 做 Shuffle，相同 key 落到同一分区，再排序合并。代价是网络、磁盘溢写、Stage 切分。适合两边都大，或者小表其实已经超过广播阈值。</p>
+<p><strong>Broadcast Hash Join</strong>：Driver 把小表 collect 成哈希表，广播到每个 Executor；大表每个 partition 本地 probe，<strong>大表不 Shuffle</strong>。省的是大表那一次全量交换。Spark SQL 里小表低于 <code>spark.sql.autoBroadcastJoinThreshold</code>（默认常见 10MB）会自动广播，也可以 <code>/*+ BROADCAST(d) */</code> 强制。</p>
+<p>我面试会按「谁搬家」讲选型：<br>1. <strong>事实表很大、维度很小</strong>（城市码表、配置、活动名单）：Broadcast。这是数仓里最常见的星型关联。<br>2. <strong>两边都是大事实、或维表已经上 GB</strong>：Shuffle / SMJ。硬广播会把 Driver 和每个 Executor 的堆打满。<br>3. <strong>一边中等、统计过期</strong>：别死盯阈值。AQE（<code>spark.sql.adaptive.enabled</code>）可以在运行中看真实大小，把本来的 SMJ 改成 Broadcast，或把倾斜分区拆开。<br>4. <strong>join key 倾斜</strong>：广播解决不了「一个 key 占 80%」——大表那个分区本地哈希还是爆。要先打散/加盐，或让 AQE 拆倾斜分区；空字符串、<code>unknown</code> 当 key 等于人为制造一个超热 key。</p>
+<p>落地长这样：</p>
+<pre><code>-- 维表明确很小：强制广播，避免统计不准走了 SMJ
+SELECT /*+ BROADCAST(d) */
+  f.order_id, f.gmv, d.city_name
+FROM fct_order f
+JOIN dim_city d
+  ON f.city_id = d.city_id;
+
+-- 两边都大：不要 BROADCAST，让优化器走 SMJ
+SELECT /*+ SHUFFLE_MERGE(a, b) */
+  a.user_id, b.sku_id
+FROM fct_click a
+JOIN fct_order b
+  ON a.user_id = b.user_id
+ AND a.dt = b.dt;</code></pre>
+<p>口述收尾：先说「小表复印、大表不搬家」；再主动报阈值、Driver 内存和倾斜。面试官要的是你会看计划，不是会背 hint 单词。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">Broadcast Hash Join</span><span class="keyword-chip">Sort-Merge Join</span><span class="keyword-chip">autoBroadcastJoinThreshold</span><span class="keyword-chip">AQE</span><span class="keyword-chip">大表不 Shuffle</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：广播阈值怎么定？10MB 是不是越大越好？</h4>
+            <div class="followup-answer"><p>默认 10MB 是保守值，指的是广播表的计划大小，不是源表文件大小。调大能让更多维表走 BHJ，但 Driver 要 collect、每个 Executor 要各持一份副本。Executor 堆 4g、同时 8 个 task 复用一份广播还好；若小表其实 800MB，100 个 Executor 就复制了几十 GB 的堆外/堆内压力，GC 和广播超时会先爆。经验：单表广播控制在「远小于 Executor 内存的一小截」，多张维表要加总。超过就 SMJ。调阈值前先看 Spark UI 的 Broadcast 大小和 Driver 内存。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：AQE 和 Broadcast Join 是什么关系？hint 还要不要写？</h4>
+            <div class="followup-answer"><p>AQE 在 Shuffle 写完后能看到真实分区大小，可能把 SMJ 改成 BHJ，也可能拆倾斜分区。统计过期、动态分区裁剪后表变小时，AQE 很有用。hint 仍然要：SLA 紧、维表确定很小、你不能赌统计——直接 BROADCAST。两边都大就 SHUFFLE_MERGE，防止 AQE 误广播。AQE 不是替代判断，是给「运行中才知道大小」兜底。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：Broadcast Join 还会 OOM 或变慢吗？和数据倾斜怎么一起答？</h4>
+            <div class="followup-answer"><p>会。Driver collect 小表时 OOM；Executor 上广播表 + 当前分区哈希表叠加 OOM；广播文件超时任务反复拉。倾斜时：即便走了 BHJ，大表热 key 那个 partition 仍然巨大，本地 join 照样慢/爆。处理是两层：表级选 BHJ 还是 SMJ；key 级加盐、过滤空 key、AQE skew join。不要把「开了 broadcast」当成倾斜已经治好。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>把「小表」理解成行数少，忽略列很宽、字符串很大，10 万行也能有几百 MB</li><li>维表其实上 GB 仍写 BROADCAST，Driver collect 直接 OOM</li><li>以为广播能治数据倾斜，热 key 在大表分区里照样爆</li><li>统计信息过期导致该广播没广播、不该广播被广播，却不去看 Spark UI 的实际计划</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">小表能进内存就广播，让大表别搬家；两边都大或会把 Driver 打爆，就走 Shuffle。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

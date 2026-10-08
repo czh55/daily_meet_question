@@ -208,5 +208,11 @@
     "slug": "realtime-vs-batch",
     "title": "实时数仓和离线数仓如何分工与统一口径？",
     "category": "数据工程"
+  },
+  {
+    "date": "2026-10-08",
+    "slug": "spark-broadcast-join",
+    "title": "Spark 里 Broadcast Join 和 Shuffle Join 有什么区别？怎么选？",
+    "category": "大数据计算"
   }
 ]

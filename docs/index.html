@@ -15,7 +15,7 @@
             <a href="index.html" class="logo">
                 <span class="logo-icon">&#x25C7;</span>
             </a>
-            <span class="header-date">2026-10-07</span>
+            <span class="header-date">2026-10-08</span>
         </div>
     </header>
 
@@ -27,14 +27,14 @@
 
         <div class="today-problem">
             <div class="today-label">&#x1F4C5; 今日推荐</div>
-            <h2><a href="archive/2026-10-07.html">#35 实时数仓和离线数仓如何分工与统一口径？</a></h2>
+            <h2><a href="archive/2026-10-08.html">#36 Spark 里 Broadcast Join 和 Shuffle Join 有什么区别？怎么选？</a></h2>
             <div class="today-meta">
-                <span class="problem-type tag-de">数据工程</span>
-                <span class="problem-difficulty difficulty-hard">困难</span>
+                <span class="problem-type tag-bigdata">大数据计算</span>
+                <span class="problem-difficulty difficulty-medium">中等</span>
             </div>
             <p style="margin-top:12px; color:var(--text-secondary); font-size:0.9rem;">
-                这题考的不是「实时用 Flink、离线用 Hive」的组件清单，而是候选人有没有在生产里处理过「两套仓、两套数、业务对不上」。面试官想听：按 SLA 和完整性怎么分工、口径谁说了算、迟到数据怎么收口、实时数怎么被离线校准。只背 Lambda/Kappa 却说不清对账，这题就浅了。...
-                <a href="archive/2026-10-07.html">[查看完整讲解]</a>
+                这题考的不是背两个 Join 名字，而是候选人有没有在生产里为「大表关联维表 / 大表关联大表」选过执行计划。面试官想听：Shuffle 为什么贵、广播为什么能省、表多大能广播、倾斜和 AQE 怎么接。只说「小表用 broadcast」却说不清 Driver 内存、副本和空值倾斜，这题就浅了。...
+                <a href="archive/2026-10-08.html">[查看完整讲解]</a>
             </p>
         </div>
 
@@ -42,6 +42,12 @@
             <h2>&#x1F4DA; 往期归档</h2>
             <div class="archive-grid">
                 <div class="archive-item">
+            <a href="archive/2026-10-07.html">
+                <div class="archive-date">2026-10-07</div>
+                <div class="archive-title">实时数仓和离线数仓如何分工与统一口径？</div>
+                <span class="archive-type problem-type tag-de">数据工程</span>
+            </a>
+        </div><div class="archive-item">
             <a href="archive/2026-10-06.html">
                 <div class="archive-date">2026-10-06</div>
                 <div class="archive-title">代理键和自然键怎么选？</div>
@@ -262,6 +268,14 @@
             </ul>
         </div><div class="type-card">
             <div class="type-card-header">
+                <span class="problem-type tag-bigdata">大数据计算</span>
+                <span class="type-count">4 题</span>
+            </div>
+            <ul class="type-problem-list">
+                <li><a href="archive/2026-10-08.html">Spark 里 Broadcast Join 和 Shuffle Join 有什么区别？怎么选？</a><span class="type-item-date">2026-10-08</span></li><li><a href="archive/2026-09-28.html">Spark 窄依赖和宽依赖的区别？</a><span class="type-item-date">2026-09-28</span></li><li><a href="archive/2026-09-15.html">Hive/数仓里分区和分桶的区别是什么？怎么用？</a><span class="type-item-date">2026-09-15</span></li><li><a href="archive/2026-09-11.html">Spark 作业里 Shuffle 是什么？常见 OOM / 数据倾斜怎么处理？</a><span class="type-item-date">2026-09-11</span></li>
+            </ul>
+        </div><div class="type-card">
+            <div class="type-card-header">
                 <span class="problem-type tag-dw">数仓建模</span>
                 <span class="type-count">4 题</span>
             </div>
@@ -275,14 +289,6 @@
             </div>
             <ul class="type-problem-list">
                 <li><a href="archive/2026-10-07.html">实时数仓和离线数仓如何分工与统一口径？</a><span class="type-item-date">2026-10-07</span></li><li><a href="archive/2026-09-29.html">数据写入如何设计幂等？</a><span class="type-item-date">2026-09-29</span></li><li><a href="archive/2026-09-19.html">Kafka 在数据链路里通常扮演什么角色？分区与消费者组怎么理解？</a><span class="type-item-date">2026-09-19</span></li><li><a href="archive/2026-09-12.html">设计一条从业务库到数仓的日更 ETL 链路，你会怎么做？</a><span class="type-item-date">2026-09-12</span></li>
-            </ul>
-        </div><div class="type-card">
-            <div class="type-card-header">
-                <span class="problem-type tag-bigdata">大数据计算</span>
-                <span class="type-count">3 题</span>
-            </div>
-            <ul class="type-problem-list">
-                <li><a href="archive/2026-09-28.html">Spark 窄依赖和宽依赖的区别？</a><span class="type-item-date">2026-09-28</span></li><li><a href="archive/2026-09-15.html">Hive/数仓里分区和分桶的区别是什么？怎么用？</a><span class="type-item-date">2026-09-15</span></li><li><a href="archive/2026-09-11.html">Spark 作业里 Shuffle 是什么？常见 OOM / 数据倾斜怎么处理？</a><span class="type-item-date">2026-09-11</span></li>
             </ul>
         </div><div class="type-card">
             <div class="type-card-header">
