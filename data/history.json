@@ -214,5 +214,11 @@
     "slug": "spark-broadcast-join",
     "title": "Spark 里 Broadcast Join 和 Shuffle Join 有什么区别？怎么选？",
     "category": "大数据计算"
+  },
+  {
+    "date": "2026-10-09",
+    "slug": "data-reconciliation",
+    "title": "业务库和数仓对不上，你怎么对账？发现差异怎么排查？",
+    "category": "数据质量"
   }
 ]

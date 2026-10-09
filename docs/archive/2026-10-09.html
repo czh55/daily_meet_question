@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>业务库和数仓对不上，你怎么对账？发现差异怎么排查？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-10-09</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#37</span>
+                    <span class="problem-type tag-dq">数据质量</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">业务库和数仓对不上，你怎么对账？发现差异怎么排查？</h1>
+                <div class="topic-row"><span class="topic-chip">对账</span><span class="topic-chip">主键差集</span><span class="topic-chip">口径</span><span class="topic-chip">CDC</span><span class="topic-chip">补数</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>这题考的不是「跑个 COUNT 对比」，而是候选人有没有把对账当成生产门禁：先冻结口径和粒度，再比主键差集而不是只比总数，最后能顺着抽取、口径、迟到、回刷把差异收口。只说「和业务对一下」却说不清对账键、时点和补数，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先冻结对账契约：同一业务主键、同一状态定义、同一时区/截止日期、同一粒度（单、行、金额）。</li><li>分层对：源库 vs ODS 看抽全没有；ODS vs DWD 看清洗丢没丢；DWD/ADS vs 业务报表看口径漂没漂。</li><li>对比方法：先集合（FULL OUTER JOIN 找只在一边的键），再金额/状态；总数对上不等于账对。</li><li>收口：定差异等级、阻断还是告警、按分区覆盖补数，并写进 SLA。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：对账先锁契约，再锁主键，最后才比金额。总数碰巧相等最危险；差在「哪些键只在一边」才是事故现场。</p>
+<p>先问四件事，没对齐就开对，数字没有意义：<br>1. <strong>对什么</strong>：订单、支付、还是售后？成功态是下单、支付成功，还是扣除退款后的净额？<br>2. <strong>对到哪一天哪一时刻</strong>：自然日 0 点切、业务日、还是 <code>as_of=23:59:59</code>？时区谁说了算？<br>3. <strong>对账键</strong>：订单号、支付流水号，还是 <code>(user_id, sku_id, dt)</code>？复合键漏字段会假差异。<br>4. <strong>对哪一层</strong>：源库 binlog 时刻、ODS 快照、DWD 明细，还是 ADS 指标。一层一对，禁止拿源库实时余额直接打 ADS 日汇总。</p>
+<p>我落地会做成三层对账单，而不是一个 COUNT：<br>- <strong>抽取层（源 → ODS）</strong>：行数、主键唯一、最大更新时间。差在这里，多半是增量水位、软删、或 CDC 漏消费。<br>- <strong>转换层（ODS → DWD）</strong>：过滤条件、去重键、状态映射。差在这里，多半是测试号、取消单、币种/时区被悄悄滤掉。<br>- <strong>指标层（DWD → ADS / 业务报表）</strong>：同一份指标说明书。差在这里，是口径不是管道。</p>
+<p>核心 SQL 不是两边 COUNT，是主键差集：</p>
+<pre><code>-- 同一 dt、同一业务键，先找集合差，再比金额
+SELECT
+  COUNT(DISTINCT CASE WHEN w.order_id IS NULL THEN s.order_id END) AS only_source,
+  COUNT(DISTINCT CASE WHEN s.order_id IS NULL THEN w.order_id END) AS only_warehouse,
+  SUM(COALESCE(w.pay_amt, 0) - COALESCE(s.pay_amt, 0)) AS amt_diff
+FROM src_pay_success s
+FULL OUTER JOIN ads_pay_success w
+  ON s.order_id = w.order_id
+ AND s.dt = w.dt
+WHERE COALESCE(s.dt, w.dt) = '2026-10-08';</code></pre>
+<p><code>only_source</code>：仓里丢了（漏抽、关联把行打丢、分区裁错）。<code>only_warehouse</code>：仓里多了（重复消费、回刷 append、测试数据没滤）。金额差但键对齐：汇率、优惠分摊、退款时点。</p>
+<p>差异怎么定级：主键丢失或金额超阈值（例如 0.1% 或固定金额）→ <strong>阻断下游</strong>；行数波动但键能对上 → 告警人工确认。修复用 <strong>分区覆盖 / MERGE 按业务键</strong>，不要在错账上再 INSERT 一笔「补差额」。</p>
+<p>口述收尾：先说契约和分层，再说「FULL OUTER JOIN 看差集」，最后主动提补数是覆盖不是累加。面试官要的是你会把门禁做成可复跑的任务，不是会喊对账两个字。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">对账契约</span><span class="keyword-chip">主键差集</span><span class="keyword-chip">分层对账</span><span class="keyword-chip">水位对齐</span><span class="keyword-chip">分区覆盖补数</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：增量同步场景下，对账时点怎么选？CDC 延迟怎么处理？</h4>
+            <div class="followup-answer"><p>不要拿「此刻源库」去打「昨晚分区」。增量要对齐 <strong>同一水位</strong>：源库取 <code>updated_at &lt;= 水位</code> 的快照，仓侧取同一水位已落地的分区。CDC 延迟时，先看消费滞后和位点；滞后未追上算及时性，不是准确性事故。追上后再对。晚到的更新用分区重跑或按主键 MERGE 补进，禁止把延迟当丢数去重抽一遍造成重复。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：COUNT 一样但金额差 2%，或金额一样但主键对不上，分别怎么查？</h4>
+            <div class="followup-answer"><p>COUNT 同、金额差：键大致对齐，查状态口径（含不含退款）、币种、分摊、是否用了不同发生时间。金额同、主键对不上：最危险，多半是两边各错各的刚好抵消，或一对多被 SUM 糊住。立刻输出 only_source / only_warehouse 样本，按血缘回 ODS 和 binlog。永远不要用「总额差不多」结案。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：对账任务本身失败或成为瓶颈，你怎么设计？</h4>
+            <div class="followup-answer"><p>对账跟正式 ETL 解耦：正式链路先按 SLA 产出，对账异步跑但核心表不通过就 <strong>不开放给结算/对客</strong>。大表不要每天全量 JOIN，按 dt 分区对、按哈希抽样做快速门禁，全日差集给核心表。结果落对账明细表，保留样本键方便第二天复盘。规则进代码和阈值配置，不进个人 SQL 窗口。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>只比 COUNT / SUM，不看主键差集，两边各错一部分刚好抵消</li><li>源库「当前状态」去对数仓「昨天终态」，时点没对齐</li><li>发现差额后 INSERT 补一笔，把错账写成两笔更错的账</li><li>抽取层、口径层一起对，说不清是管道丢了还是指标定义漂了</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">对账先锁契约和主键差集，总数相等不可信；补数覆盖原分区，不要再插一笔差额。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
