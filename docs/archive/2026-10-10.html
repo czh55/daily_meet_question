@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>同比和环比怎么定义？用 SQL 怎么算、口径上有哪些坑？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-10-10</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#38</span>
+                    <span class="problem-type tag-metric">指标体系</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">同比和环比怎么定义？用 SQL 怎么算、口径上有哪些坑？</h1>
+                <div class="topic-row"><span class="topic-chip">同比</span><span class="topic-chip">环比</span><span class="topic-chip">LAG</span><span class="topic-chip">周期对齐</span><span class="topic-chip">口径</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>这题考的不是背「环比看上一期、同比看去年」，而是候选人能不能先把窗口钉死再算比率：比的是哪个指标、对齐的是完整周期还是残缺周期、分母为 0 怎么办。只报一个百分比、说不清 MTD 不能对上月全月、闰年怎么对齐，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先钉契约：同一个指标、同一粒度、同一成功态；环比是相邻周期，同比是去年同期。</li><li>再钉窗口：完整自然周/月/年才能直接比；残缺周期（MTD、周至今）必须对齐到同等天数或去年同日。</li><li>计算：先按周期聚合，再用 LAG 或自连接取基期，输出相对变化和绝对变化。</li><li>解读：看基数、工作日、大促；比率和差额一起报，禁止只丢一个涨跌幅。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：环比拿「上一期完整窗口」当镜子，同比拿「去年同一个窗口」当镜子；先对齐天数和口径，再相除。残缺的本月至今，不能去除以完整的上个月。</p>
+<p>定义我面试会先讲清楚，避免和业务各说各的：<br>- <strong>环比</strong>：相邻等长周期相比。日环比是今天 vs 昨天，周环比是本周 vs 上周，月环比是本月 vs 上月。<br>- <strong>同比</strong>：跨年对齐。10 月同比是今年 10 月 vs 去年 10 月；日同比是今天 vs 去年同一天（或去年同一周几，事先说死）。<br>- <strong>公式</strong>：<code>(本期 - 基期) / 基期</code>。基期为 0 或接近 0 时不要硬除，改报绝对增量，或标「基期过小、比率无意义」。</p>
+<p>落地不要在明细行上直接 LAG 日期再除，先把指标聚到周期粒度：</p>
+<pre><code>-- 月 GMV：先按月折好，再取上月、去年同月
+WITH monthly AS (
+  SELECT
+    date_trunc('month', dt)::date AS month_start,
+    SUM(pay_amt) AS gmv
+  FROM ads_pay_success
+  GROUP BY 1
+)
+SELECT
+  month_start,
+  gmv,
+  LAG(gmv, 1) OVER (ORDER BY month_start) AS mom_base,
+  LAG(gmv, 12) OVER (ORDER BY month_start) AS yoy_base,
+  gmv - LAG(gmv, 1) OVER (ORDER BY month_start) AS mom_delta,
+  (gmv - LAG(gmv, 1) OVER (ORDER BY month_start))
+    / NULLIF(LAG(gmv, 1) OVER (ORDER BY month_start), 0) AS mom_rate,
+  (gmv - LAG(gmv, 12) OVER (ORDER BY month_start))
+    / NULLIF(LAG(gmv, 12) OVER (ORDER BY month_start), 0) AS yoy_rate
+FROM monthly;</code></pre>
+<p><code>LAG(..., 1)</code> 是环比基期，<code>LAG(..., 12)</code> 是月粒度同比基期。日粒度同比用 <code>LAG(..., 365)</code> 会在闰年错位，更稳的是自连接 <code>dt = 去年同一天</code> 或 <code>dt - INTERVAL '1 year'</code>。</p>
+<p>窗口没对齐，比率就是假的。我默认三条规矩：<br>1. <strong>完整比完整</strong>：9 月全月 vs 8 月全月、vs 去年 9 月。<br>2. <strong>残缺比对等残缺</strong>：10 月 1–10 日，环比应对 9 月 1–10 日（或上一个等长 10 天），同比应对去年 10 月 1–10 日，禁止对 9 月 30 天。<br>3. <strong>工作日/大促要声明</strong>：周二对周一的日环比常被周末和活动打穿；双 11 的同比要同时报「含活动」和「剔除活动日」两套，或至少口头标注。</p>
+<p>口述收尾：先说「环比相邻、同比去年同期」，再主动提 MTD 对齐和 <code>NULLIF</code> 防除零，最后报比率时带上基期绝对值。面试官要的是你会把镜子摆正，不是会背两个名词。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">环比</span><span class="keyword-chip">同比</span><span class="keyword-chip">周期对齐</span><span class="keyword-chip">LAG</span><span class="keyword-chip">对等天数</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：本月还没过完，老板要看「这个月比上个月怎么样」，你怎么回？</h4>
+            <div class="followup-answer"><p>不能拿 MTD 去除以上个月全月，天数不同，跌是假跌。三条合法比法，选一条并写在标题上：① 本月 1 号到昨天 vs 上月同一号段（对等天数环比）；② 本月 1 号到昨天 vs 去年同月同一号段（对等天数同比）；③ 用日均 GMV 比，再乘当月剩余工作日做预测，预测要标明「按日均外推，不是实际」。看板标题写成「截至 10 日的对等天数环比」，不要写「月环比」。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：LAG 和自连接怎么选？闰年、2 月、周对齐怎么处理？</h4>
+            <div class="followup-answer"><p>周期连续、粒度均匀（月、周）用 LAG 最干净。日同比、要「去年同一天」或「去年同一周几」用自连接更稳：<code>a.dt = b.dt + INTERVAL '1 year'</code> 在 2 月 29 日会丢行，需要约定：闰日同比并到 2 月 28 或 3 月 1，写进指标说明书。周同比不要拿「第 42 周」对「第 42 周」就完，ISO 周年和节日错位很常见，电商更常对「去年同一周几的最近一天」或「去年大促同活动窗」。对齐规则必须先于 SQL。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：环比涨 8%、同比跌 12%，你怎么讲给业务听？</h4>
+            <div class="followup-answer"><p>先报基数：8% 是从 1000 万到 1080 万，还是从 10 万到 10.8 万，决策完全不同。再拆窗口：环比涨可能只是相对上月淡季回升，同比跌说明相对去年旺季在掉。接着切维度：新老客、渠道、类目、是否含大促。常见故事是「上月活动退潮后的环比修复」叠「去年同期有更强活动」。结论不要停在涨跌幅，要落到「相对谁、窗口是否可比、绝对值够不够大」。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>用本月至今去除以上月全月，残缺周期直接当月环比</li><li>日同比用 LAG 365 天，闰年或夏令时把日期对歪</li><li>基期接近 0 仍硬除，从 1 单到 3 单报「涨 200%」</li><li>只报百分比不报基期绝对值，也不断言工作日和大促</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">环比比相邻，同比比去年同期；先对齐完整窗口再除，残缺周期只比对等天数。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

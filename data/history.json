@@ -220,5 +220,11 @@
     "slug": "data-reconciliation",
     "title": "业务库和数仓对不上，你怎么对账？发现差异怎么排查？",
     "category": "数据质量"
+  },
+  {
+    "date": "2026-10-10",
+    "slug": "metric-yoy-mom",
+    "title": "同比和环比怎么定义？用 SQL 怎么算、口径上有哪些坑？",
+    "category": "指标体系"
   }
 ]
