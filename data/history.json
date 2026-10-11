@@ -226,5 +226,11 @@
     "slug": "metric-yoy-mom",
     "title": "同比和环比怎么定义？用 SQL 怎么算、口径上有哪些坑？",
     "category": "指标体系"
+  },
+  {
+    "date": "2026-10-11",
+    "slug": "cdc-change-data-capture",
+    "title": "CDC 是什么？把业务库变更同步到数仓时，乱序、回撤和重复怎么处理？",
+    "category": "数据工程"
   }
 ]

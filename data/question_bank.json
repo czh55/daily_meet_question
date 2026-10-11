@@ -1643,5 +1643,56 @@
       "对等天数"
     ],
     "anchor": "环比比相邻，同比比去年同期；先对齐完整窗口再除，残缺周期只比对等天数。"
+  },
+  {
+    "id": 39,
+    "slug": "cdc-change-data-capture",
+    "title": "CDC 是什么？把业务库变更同步到数仓时，乱序、回撤和重复怎么处理？",
+    "category": "数据工程",
+    "difficulty": "中等",
+    "topics": [
+      "CDC",
+      "增量同步",
+      "binlog",
+      "乱序",
+      "幂等"
+    ],
+    "ready": true,
+    "intent": "这题考的不是背 Debezium / Canal / binlog 几个组件名，而是候选人有没有把「库里的一次更新」当成可重放的事件流来设计：抽什么、按什么排序、重复消费怎么办、UPDATE/DELETE/回撤怎么落成仓里的一行。只说「听 binlog 增量同步」却说不清水位、乱序和主键 UPSERT，这题就浅了。",
+    "framework": [
+      "先定义：CDC 是捕获源库行级变更（INSERT/UPDATE/DELETE）并按提交顺序重放，不是定时 SELECT 全表。",
+      "讲链路：源库日志 → 采集位点 → 消息队列 → 按主键落地数仓；位点是水位，主键是幂等键。",
+      "收口三个生产坑：至少一次重复、乱序到达、回撤/删除；对策是版本比较 + MERGE/分区覆盖，而不是 blindly append。",
+      "对比适用边界：CDC 适合要近实时、要变更历史的表；小维表、全量更便宜时别硬上。"
+    ],
+    "answer": "一句话：CDC 把源库的每一次提交变成「带版本的变更事件」，数仓按业务主键重放这些事件；重复可以再放一遍，乱序必须比版本，回撤是 DELETE/回退而不是再插一行。\n\n**CDC（Change Data Capture）** 听的是数据库自己的变更日志（MySQL binlog、Postgres WAL、Oracle redo），不是你隔几分钟扫一遍 `updated_at`。扫 `updated_at` 会漏：同秒更新、时钟回拨、软删不改时间戳、事务未提交就读到脏值。日志里有提交顺序，这才是增量的真相。\n\n一条事件我面试会先报五个字段，缺一个落地就会漂：\n1. **业务主键**：订单号，不是自增代理键在仓里再造一个对不上的。\n2. **操作类型**：I / U / D（以及回撤、DDL，能识别就要识别）。\n3. **提交版本**：binlog 位点、LSN、或 `(commit_ts, tx_id)`。这是乱序时的裁判。\n4. **镜像**：至少 after 镜像；要做 SCD2 / 审计再留 before。\n5. **事件时间 vs 处理时间**：对账和分区按源库提交时间，不按 Flink 收到的时间。\n\n链路通常是：采集器记住位点 → 写入 Kafka（按主键哈希分区，**同一主键有序**）→ 下游按主键 MERGE 进 ODS/DWD。位点提交要在「仓里写成功」之后，至少一次丢失靠重放扛，不靠祈祷。\n\n落地不要 append 成流水却当最新状态用：\n```sql\n-- ODS 落最新状态：只接受「更新」的版本，重复和乱序都靠版本挡住\nMERGE INTO ods_order t\nUSING cdc_order_delta s\nON t.order_id = s.order_id\nWHEN MATCHED AND s.commit_lsn > t.commit_lsn THEN UPDATE SET\n  status     = s.status,\n  pay_amt    = s.pay_amt,\n  commit_lsn = s.commit_lsn,\n  op         = s.op,\n  updated_at = s.commit_ts\nWHEN MATCHED AND s.op = 'D' AND s.commit_lsn > t.commit_lsn THEN UPDATE SET\n  is_deleted = 1,\n  commit_lsn = s.commit_lsn\nWHEN NOT MATCHED AND s.op <> 'D' THEN INSERT *;\n```\n`commit_lsn` 小的事件直接丢，这就是乱序的收口。删除我倾向软删 + 下游过滤，硬删会让对账找不到「只在源库已消失」的键。\n\n和定时增量怎么选，我按约束答：\n- **要近实时、要 DELETE、要审计变更**：CDC。\n- **表很小、一日几次全量更便宜、或源库不开放日志**：全量覆盖或 `updated_at` 增量，并承认漏更新风险。\n- **已经有业务事件总线且事件=事实**：听业务事件，CDC 做对账旁路，不要两套真相。\n\n口述收尾：先说「日志重放 + 主键幂等 + 版本比大小」，再主动提位点在写入成功后提交。面试官要的是你会把 binlog 当成可重放的账本，不是会背一个采集器名字。",
+    "followups": [
+      {
+        "q": "至少一次投递下，同一条 UPDATE 来了两次，或先来了新版本再来旧版本，仓里会怎样？",
+        "a": "只认版本，不认到达顺序。同一 LSN 再来一次，`commit_lsn > t.commit_lsn` 不成立，MERGE 空转，这就是幂等。旧版本后到同样被挡。没有版本字段就只能「最后写入获胜」，乱序会把新状态打回旧状态——这是 CDC 最常见的生产事故。Kafka 按主键分区只能保证单分区有序，重平衡、多源合流、重放旧 topic 仍然会乱，版本比较不能省。"
+      },
+      {
+        "q": "源库做了更新回滚、订单取消、或物理删除，数仓怎么跟？",
+        "a": "回滚/取消在 binlog 里通常是又一次 UPDATE（状态改回）或 DELETE。下游按新版本覆盖，不要在事实表再 INSERT 一笔「负向补差」除非指标层明确要事件流水。物理删除要转成墓碑：软删标记 + 下游 DWD 过滤；否则对账时源库查不到、仓里还在，说不清是漏删还是源库已真空。DDL（加列、改类型）单独走 schema 演进，禁止和行变更混在一个 MERGE 里瞎猜默认值。"
+      },
+      {
+        "q": "CDC 延迟高、位点落后，你怎么判断是采集慢还是下游慢？要不要切回全量？",
+        "a": "看三截水位：源库日志产生位点、采集已提交位点、仓表最大 commit_lsn。第一截差大是源库写爆或采集挂了；第二截差大是队列积压或下游 MERGE 跟不上。积压时先扩消费者、按主键分区保序，不要擅自改成「丢中间只取最新」除非业务允许。长期落后或日志被 purge：用一次全量快照重建位点再接增量，禁止在断档上继续听，会永久漏一段。全量不是认输，是接上账本的合法手段。"
+      }
+    ],
+    "pitfalls": [
+      "用 updated_at 增量冒充 CDC，同秒更新、软删、时钟回拨都会漏",
+      "ODS 对变更事件只 INSERT 不按主键 MERGE，重复消费把最新状态打成多行",
+      "没有 LSN/版本比较，乱序把新状态覆盖回旧值",
+      "位点在写入成功前就提交，下游失败后这段 binlog 被当成已同步，永久丢数"
+    ],
+    "keywords": [
+      "CDC",
+      "binlog 位点",
+      "主键 MERGE",
+      "版本比较",
+      "至少一次"
+    ],
+    "anchor": "CDC 是按提交版本重放行变更；重复靠主键幂等，乱序靠 LSN 比大小，禁止无版本地后写覆盖。"
   }
 ]

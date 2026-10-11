@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CDC 是什么？把业务库变更同步到数仓时，乱序、回撤和重复怎么处理？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-10-11</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#39</span>
+                    <span class="problem-type tag-de">数据工程</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">CDC 是什么？把业务库变更同步到数仓时，乱序、回撤和重复怎么处理？</h1>
+                <div class="topic-row"><span class="topic-chip">CDC</span><span class="topic-chip">增量同步</span><span class="topic-chip">binlog</span><span class="topic-chip">乱序</span><span class="topic-chip">幂等</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>这题考的不是背 Debezium / Canal / binlog 几个组件名，而是候选人有没有把「库里的一次更新」当成可重放的事件流来设计：抽什么、按什么排序、重复消费怎么办、UPDATE/DELETE/回撤怎么落成仓里的一行。只说「听 binlog 增量同步」却说不清水位、乱序和主键 UPSERT，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先定义：CDC 是捕获源库行级变更（INSERT/UPDATE/DELETE）并按提交顺序重放，不是定时 SELECT 全表。</li><li>讲链路：源库日志 → 采集位点 → 消息队列 → 按主键落地数仓；位点是水位，主键是幂等键。</li><li>收口三个生产坑：至少一次重复、乱序到达、回撤/删除；对策是版本比较 + MERGE/分区覆盖，而不是 blindly append。</li><li>对比适用边界：CDC 适合要近实时、要变更历史的表；小维表、全量更便宜时别硬上。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：CDC 把源库的每一次提交变成「带版本的变更事件」，数仓按业务主键重放这些事件；重复可以再放一遍，乱序必须比版本，回撤是 DELETE/回退而不是再插一行。</p>
+<p><strong>CDC（Change Data Capture）</strong> 听的是数据库自己的变更日志（MySQL binlog、Postgres WAL、Oracle redo），不是你隔几分钟扫一遍 <code>updated_at</code>。扫 <code>updated_at</code> 会漏：同秒更新、时钟回拨、软删不改时间戳、事务未提交就读到脏值。日志里有提交顺序，这才是增量的真相。</p>
+<p>一条事件我面试会先报五个字段，缺一个落地就会漂：<br>1. <strong>业务主键</strong>：订单号，不是自增代理键在仓里再造一个对不上的。<br>2. <strong>操作类型</strong>：I / U / D（以及回撤、DDL，能识别就要识别）。<br>3. <strong>提交版本</strong>：binlog 位点、LSN、或 <code>(commit_ts, tx_id)</code>。这是乱序时的裁判。<br>4. <strong>镜像</strong>：至少 after 镜像；要做 SCD2 / 审计再留 before。<br>5. <strong>事件时间 vs 处理时间</strong>：对账和分区按源库提交时间，不按 Flink 收到的时间。</p>
+<p>链路通常是：采集器记住位点 → 写入 Kafka（按主键哈希分区，<strong>同一主键有序</strong>）→ 下游按主键 MERGE 进 ODS/DWD。位点提交要在「仓里写成功」之后，至少一次丢失靠重放扛，不靠祈祷。</p>
+<p>落地不要 append 成流水却当最新状态用：</p>
+<pre><code>-- ODS 落最新状态：只接受「更新」的版本，重复和乱序都靠版本挡住
+MERGE INTO ods_order t
+USING cdc_order_delta s
+ON t.order_id = s.order_id
+WHEN MATCHED AND s.commit_lsn &gt; t.commit_lsn THEN UPDATE SET
+  status     = s.status,
+  pay_amt    = s.pay_amt,
+  commit_lsn = s.commit_lsn,
+  op         = s.op,
+  updated_at = s.commit_ts
+WHEN MATCHED AND s.op = 'D' AND s.commit_lsn &gt; t.commit_lsn THEN UPDATE SET
+  is_deleted = 1,
+  commit_lsn = s.commit_lsn
+WHEN NOT MATCHED AND s.op &lt;&gt; 'D' THEN INSERT *;</code></pre>
+<p><code>commit_lsn</code> 小的事件直接丢，这就是乱序的收口。删除我倾向软删 + 下游过滤，硬删会让对账找不到「只在源库已消失」的键。</p>
+<p>和定时增量怎么选，我按约束答：<br>- <strong>要近实时、要 DELETE、要审计变更</strong>：CDC。<br>- <strong>表很小、一日几次全量更便宜、或源库不开放日志</strong>：全量覆盖或 <code>updated_at</code> 增量，并承认漏更新风险。<br>- <strong>已经有业务事件总线且事件=事实</strong>：听业务事件，CDC 做对账旁路，不要两套真相。</p>
+<p>口述收尾：先说「日志重放 + 主键幂等 + 版本比大小」，再主动提位点在写入成功后提交。面试官要的是你会把 binlog 当成可重放的账本，不是会背一个采集器名字。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">CDC</span><span class="keyword-chip">binlog 位点</span><span class="keyword-chip">主键 MERGE</span><span class="keyword-chip">版本比较</span><span class="keyword-chip">至少一次</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：至少一次投递下，同一条 UPDATE 来了两次，或先来了新版本再来旧版本，仓里会怎样？</h4>
+            <div class="followup-answer"><p>只认版本，不认到达顺序。同一 LSN 再来一次，<code>commit_lsn &gt; t.commit_lsn</code> 不成立，MERGE 空转，这就是幂等。旧版本后到同样被挡。没有版本字段就只能「最后写入获胜」，乱序会把新状态打回旧状态——这是 CDC 最常见的生产事故。Kafka 按主键分区只能保证单分区有序，重平衡、多源合流、重放旧 topic 仍然会乱，版本比较不能省。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：源库做了更新回滚、订单取消、或物理删除，数仓怎么跟？</h4>
+            <div class="followup-answer"><p>回滚/取消在 binlog 里通常是又一次 UPDATE（状态改回）或 DELETE。下游按新版本覆盖，不要在事实表再 INSERT 一笔「负向补差」除非指标层明确要事件流水。物理删除要转成墓碑：软删标记 + 下游 DWD 过滤；否则对账时源库查不到、仓里还在，说不清是漏删还是源库已真空。DDL（加列、改类型）单独走 schema 演进，禁止和行变更混在一个 MERGE 里瞎猜默认值。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：CDC 延迟高、位点落后，你怎么判断是采集慢还是下游慢？要不要切回全量？</h4>
+            <div class="followup-answer"><p>看三截水位：源库日志产生位点、采集已提交位点、仓表最大 commit_lsn。第一截差大是源库写爆或采集挂了；第二截差大是队列积压或下游 MERGE 跟不上。积压时先扩消费者、按主键分区保序，不要擅自改成「丢中间只取最新」除非业务允许。长期落后或日志被 purge：用一次全量快照重建位点再接增量，禁止在断档上继续听，会永久漏一段。全量不是认输，是接上账本的合法手段。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>用 updated_at 增量冒充 CDC，同秒更新、软删、时钟回拨都会漏</li><li>ODS 对变更事件只 INSERT 不按主键 MERGE，重复消费把最新状态打成多行</li><li>没有 LSN/版本比较，乱序把新状态覆盖回旧值</li><li>位点在写入成功前就提交，下游失败后这段 binlog 被当成已同步，永久丢数</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">CDC 是按提交版本重放行变更；重复靠主键幂等，乱序靠 LSN 比大小，禁止无版本地后写覆盖。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
