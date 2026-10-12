@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>事务事实表、周期快照事实表、累积快照事实表有什么区别？怎么选？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-10-12</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#40</span>
+                    <span class="problem-type tag-dw">数仓建模</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">事务事实表、周期快照事实表、累积快照事实表有什么区别？怎么选？</h1>
+                <div class="topic-row"><span class="topic-chip">事务事实</span><span class="topic-chip">周期快照</span><span class="topic-chip">累积快照</span><span class="topic-chip">粒度</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>这题考的不是背三种表名，而是候选人会不会先定粒度：一行代表一次事件、一个时点状态，还是一条过程的生命周期。只说「事实表存指标」却说不清迟到怎么补、库存从哪来、订单从下到签怎么关单，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先定粒度：一行代表什么，主键/退化维是什么，这比选表类型更先。</li><li>三种范式分开讲：事务事实=事件发生一次记一次；周期快照=按固定周期给状态拍照；累积快照=一条过程从开始到结束覆盖节点时间。</li><li>用同一业务（订单/库存）把三种都落到例子上，说明它们回答的问题不同，不是互相替代。</li><li>收口生产约束：迟到补数、与 SCD2 维表时间对齐、禁止把三种粒度混进一张表。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：先问「这一行代表什么」。发生过的事件用事务事实流水；某个时点「是什么样」用周期快照；一条过程从开始走到结束、要按节点关单，用累积快照覆盖。</p>
+<p><strong>粒度是第一决策。</strong> 面试我先报：这一行的业务主键是什么、退化维（订单号）留不留、度量是可加的（金额、件数）还是半可加/不可加的（余额、比率）。粒度漂了，后面星型、SCD、对账全会漂。</p>
+<p>三种怎么分：<br>1. <strong>事务事实（transaction fact）</strong>：一件事发生一次，插一行，事后原则上不改。下单、支付、退款、点击都是。适合漏斗、GMV、次数。迟到就补插或按事件主键重放，不要去改别人的行。<br>2. <strong>周期快照（periodic snapshot）</strong>：固定周期（通常一天）给状态拍一张照片。库存结存、账户余额、在途订单数。适合「那天结束时还剩多少」。流水加总得不到时点存量，必须另建快照或从流水重放截止水位。<br>3. <strong>累积快照（accumulating snapshot）</strong>：一条过程一行，下单时间、支付时间、发货时间、签收时间是多列里程碑，节点到达就 UPDATE。适合履约时效、停留时长、当前卡在哪一步。主键是过程键（订单号），不是「每次状态变化再插一行」。</p>
+<p>同一笔订单三种都可能要，职责不同：</p>
+<pre><code>-- 事务：支付发生一次一行
+SELECT dt, COUNT(*) AS pay_cnt, SUM(pay_amt) AS gmv
+FROM fct_pay_txn
+WHERE dt = '2026-10-12'
+GROUP BY 1;
+
+-- 周期快照：当天结束时的库存，不能对流水 SUM 充数
+SELECT sku_id, on_hand_qty, snapshot_dt
+FROM fct_inventory_snapshot
+WHERE snapshot_dt = '2026-10-12';
+
+-- 累积：过程一行，节点列被覆盖；时效=后一节点减前一节点
+SELECT
+  order_id,
+  TIMESTAMPDIFF(HOUR, pay_at, ship_at) AS pay_to_ship_h,
+  CASE
+    WHEN signed_at IS NOT NULL THEN 'signed'
+    WHEN ship_at   IS NOT NULL THEN 'shipped'
+    WHEN pay_at    IS NOT NULL THEN 'paid'
+    ELSE 'created'
+  END AS current_step
+FROM fct_order_accum;</code></pre>
+<p>怎么选，我按问题答，不按感觉答：<br>- 问「发生了多少次、多少钱」→ 事务事实。<br>- 问「那天结束时还剩多少、当时余额」→ 周期快照。<br>- 问「从 A 到 B 多久、卡在哪一步、关没关单」→ 累积快照。</p>
+<p>和维表：事务/累积里的维键要对齐事件发生时刻的 SCD2 有效期，周期快照对齐快照日。不要拿「今天的商品类目」去解释「上周那笔支付」。</p>
+<p>口述收尾：先说粒度，再说三种各回答什么问题，主动提库存不能靠流水 SUM、累积表按过程键 UPDATE 而不是 append。面试官要的是你会为问题选表，不是会背 Kimball 目录。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">粒度</span><span class="keyword-chip">事务事实</span><span class="keyword-chip">周期快照</span><span class="keyword-chip">累积快照</span><span class="keyword-chip">无事实的事实</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：无事实的事实表（factless fact）是什么？什么时候用？</h4>
+            <div class="followup-answer"><p>没有可加度量、只有维键的事实，用来记录「发生过这个关系」。例如学生选课、促销覆盖了哪些 SKU、某日某用户是否活跃。计数用 COUNT(*)，不要硬造一个恒为 1 的 amount 列当度量——可以，但要在口径里写死。它仍然要先定粒度：一行是一次选课，还是一天一次覆盖。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：支付成功晚到了一天，三种表分别怎么补？累积快照能不能改成每次状态变化都 INSERT？</h4>
+            <div class="followup-answer"><p>事务事实：按支付事件主键补插（或 MERGE），分区按事件日不是处理日，补数覆盖该事件日分区。周期快照：从迟到日起重放结存，不能只改今天——昨天结存已经被用过。累积快照：按订单号 UPDATE 对应里程碑列，用「节点时间更晚才覆盖」避免乱序把已签收打回已发货。不要改成每次状态变化都 INSERT，那是事务事实，查询时效还得再取末次，粒度已经变了。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：能只用事务事实、每晚重放到快照吗？为什么还要物化周期快照？</h4>
+            <div class="followup-answer"><p>能，作为补数和重建手段必须能。但日常查询不能每次从开业第一天 scan 流水。时点存量、半可加度量（余额）和「当时在库」都要物化快照，并声明水位：这张快照重放到哪个事务日。流水是账本，快照是给分析师用的读模型，两者都要，对账靠主键+结存等式，而不是二选一。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>三种粒度混进一张表，一行有时是事件、有时是状态，对账和聚合都会漂</li><li>用支付流水 SUM 当库存结存，退货、盘点、在途全对不上</li><li>累积快照每次节点变化都 INSERT，同一订单多行，当前步骤还得再取末次</li><li>周期快照只留最新一天，历史时点状态丢了，同比和当时归因做不了</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">先定一行代表什么：事件用事务流水，时点状态用周期快照，过程节点用累积覆盖；禁止三种粒度混表。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

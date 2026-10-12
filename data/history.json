@@ -232,5 +232,11 @@
     "slug": "cdc-change-data-capture",
     "title": "CDC 是什么？把业务库变更同步到数仓时，乱序、回撤和重复怎么处理？",
     "category": "数据工程"
+  },
+  {
+    "date": "2026-10-12",
+    "slug": "dw-fact-table-types",
+    "title": "事务事实表、周期快照事实表、累积快照事实表有什么区别？怎么选？",
+    "category": "数仓建模"
   }
 ]
