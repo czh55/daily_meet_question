@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A/B 实验里什么是 SRM？发现分流比例和设计不一致，你会怎么排查？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-10-13</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#41</span>
+                    <span class="problem-type tag-ab">A/B实验</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">A/B 实验里什么是 SRM？发现分流比例和设计不一致，你会怎么排查？</h1>
+                <div class="topic-row"><span class="topic-chip">SRM</span><span class="topic-chip">分流哈希</span><span class="topic-chip">卡方检验</span><span class="topic-chip">实验可信度</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>SRM 是实验可信度的保险丝。这题考的不是会背「样本比例不匹配」，而是候选人知不知道：分流一歪，随机化假设就坏了，后面的 p 值、提升、分段都不能当因果用。面试官要听你怎么验、怎么查、怎么停，而不是人数差了一点还继续讲显著。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先定义：设计分流比 vs 实际进入分析的人数比，对不上就是 SRM。</li><li>再说危害：随机化失效，组间不再期望可比，指标差可能来自分流偏差而不是策略。</li><li>检测：卡方拟合优度；第一天和结束都看；触发型实验要拆「分到」和「曝光」。</li><li>排查按链路：哈希/桶 → 过滤与触发 → 多层互斥 → 日志与 Bot；确认后停分析、修分流、重开，禁止加权硬出结论。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：SRM 就是实际人数比和设计分流比对不上。一对不上，先当实验坏了去查分流，而不是继续解读转化率。</p>
+<p><strong>为什么致命。</strong> A/B 的因果靠随机化：每个用户进哪一组的概率已知，两组协变量在期望上平衡。人数比歪了，说明进组机制和你以为的不一样——某类用户（新客、某渠道、某机型、爬虫）更容易进某一组。这时「唯一差别是策略」不成立，显著可能只是人群结构差。</p>
+<p><strong>怎么验。</strong> 设计比例已知（如 50/50），观察到每组人数 n，总人数 N。拟合优度：<br><code>χ² = Σ (O − E)² / E</code>，其中 <code>E = N × 设计比例</code>。<br>业界常用阈值比指标的 0.05 更严（常见 p &lt; 0.001）：分流是确定性机制，真随机不该长期偏。大样本下用 0.05 会天天误报，用得太松又放过高偏。SQL 先数「分配到的人」，不要先数曝光：</p>
+<pre><code>-- 按实验单元去重后看份额；设计 50/50
+SELECT
+  exp_group,
+  COUNT(DISTINCT user_id) AS n,
+  COUNT(DISTINCT user_id) * 1.0
+    / SUM(COUNT(DISTINCT user_id)) OVER () AS share
+FROM exp_assign
+WHERE exp_id = 'pay_btn_v2'
+  AND assign_dt BETWEEN '2026-09-01' AND '2026-09-14'
+GROUP BY 1;</code></pre>
+<p>把 n 和期望丢进卡方。第一天就要看，不要跑完两周才发现整段作废。</p>
+<p><strong>常见根因，按链路从上游查：</strong><br>1. <strong>哈希与分桶</strong>：salt 改了、桶边界含糊、登录前后 user_id 会变、字符串哈希不均匀。<br>2. <strong>进入条件 / 触发偏倚</strong>：分析过滤了「完成曝光」，而曝光本身受策略影响（实验组按钮更大更容易被看见），表观人数也会歪。<br>3. <strong>多层 / 互斥域</strong>：两个实验抢同一层，或互斥把某组流量吃掉。<br>4. <strong>管道与计数</strong>：客户端丢实验组日志、重定向只打一组、Bot 打满某一组、App 缓存旧分组；分子按曝光、分母按分配，实验单元不一致。</p>
+<p><strong>怎么处理：</strong> 报警即停解读，结论标「SRM，不可信」。修根因后开新实验。日志晚到可以等水位再验一次；第一天就歪且持续，多半是哈希或过滤，不是迟到。</p>
+<p>口述收尾：先报「设计比 vs 实际比 + 卡方」，再说「SRM 是作废灯」，主动把分配人数和曝光人数分开。面试官要的是你会拔保险丝，不是在歪掉的天平上读数。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">SRM</span><span class="keyword-chip">设计分流比</span><span class="keyword-chip">卡方拟合</span><span class="keyword-chip">触发偏倚</span><span class="keyword-chip">作废重开</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：卡方怎么算？阈值为什么常用 0.001 而不是 0.05？</h4>
+            <div class="followup-answer"><p>两组 50/50 时 E=N/2，χ² = 2*(n_A−N/2)² / (N/2) = 4*(n_A−N/2)² / N，自由度 1。N=10 万、50/50，差两三千人就已经非常不像随机。分流是工程机制，假阳性要极低，所以阈值比指标假设检验更严。反过来，实验刚启动只有几百人时不要急着判死刑，看累计是否向设计比收敛；持续偏离再停。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：分配人数 50/50 正常，但曝光人数差很多，还能分析吗？</h4>
+            <div class="followup-answer"><p>分配 SRM 通过只说明「进组概率」没坏。曝光差可能是策略本身（按钮更大、弹窗更勤）——这是处理效应，不是分流事故；分析要用 ITT（按分配），不要按「看见了才进样本」，否则触发偏倚会把效应夸大。若业务问题就是曝光率，把它当主指标或过程指标，而不是把未曝光的人从分母里扔走。分配歪了才是作废；曝光差要解释，不一定作废。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：已经 SRM 了，能不能用倾向得分 / 逆概率加权把样本救回来？</h4>
+            <div class="followup-answer"><p>生产结论上不要。SRM 说明你没观测到的进组机制已经和策略缠在一起，加权只能平衡你能列出来的协变量，列不出的（爬虫、某版本丢日志、某渠道跳转失败）仍然偏。加权还把方差和口径讲不清楚。正确动作是修哈希/过滤、切新 salt、重开实验。探索性分析可以标注「已 SRM、仅供找根因」，不能写进上线决策。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>不做 SRM 检查，直接看转化率显著就准备全量</li><li>用指标的 α=0.05 当 SRM 阈值：大样本几乎天天响，或反过来太松放过高偏</li><li>把曝光人数不均当成分配 SRM，或反过来把触发偏倚当成「策略有效」</li><li>发现比例不对仍做 IPW 加权，继续出上线结论</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">分流比例对不上就先别信因果；SRM 是实验作废灯，不是加权能修的小偏差。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

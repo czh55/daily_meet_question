@@ -238,5 +238,11 @@
     "slug": "dw-fact-table-types",
     "title": "事务事实表、周期快照事实表、累积快照事实表有什么区别？怎么选？",
     "category": "数仓建模"
+  },
+  {
+    "date": "2026-10-13",
+    "slug": "ab-srm-sample-ratio-mismatch",
+    "title": "A/B 实验里什么是 SRM？发现分流比例和设计不一致，你会怎么排查？",
+    "category": "A/B实验"
   }
 ]
