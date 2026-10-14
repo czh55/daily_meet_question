@@ -1794,5 +1794,56 @@
       "作废重开"
     ],
     "anchor": "分流比例对不上就先别信因果；SRM 是实验作废灯，不是加权能修的小偏差。"
+  },
+  {
+    "id": 42,
+    "slug": "sql-exists-vs-in",
+    "title": "SQL 里 IN 和 EXISTS 有什么区别？怎么选？碰到 NULL 要注意什么？",
+    "category": "SQL",
+    "difficulty": "中等",
+    "topics": [
+      "IN",
+      "EXISTS",
+      "半连接",
+      "NULL",
+      "子查询"
+    ],
+    "ready": true,
+    "intent": "这题考的不是背「IN 是集合、EXISTS 是相关子查询」，而是候选人知不知道：两者多数时候是半连接，优化器可能改写成同一种计划；真正要讲清的是执行形态、NULL 三值逻辑，以及什么时候该改写成 JOIN。只说「小表用 IN、大表用 EXISTS」却说不清 NOT IN 吞行，这题就浅了。",
+    "framework": [
+      "先给语义：IN 看值是否落在集合里；EXISTS 看子查询是否至少返回一行，找到就停。",
+      "再讲执行与改写：多数引擎会把 IN/EXISTS 收成半连接；相关子查询不等于一定逐行执行。",
+      "把 NULL 单独拿出来：NOT IN 遇到 NULL 可能整段变空；NOT EXISTS / LEFT JOIN IS NULL 才稳。",
+      "收口怎么选：要「是否存在」用 EXISTS；要「值在名单里」用 IN；要带出右表字段就 JOIN，不要硬用 IN。"
+    ],
+    "answer": "一句话：IN 问「这个值在不在名单里」；EXISTS 问「对当前行，那边有没有至少一行」。多数情况下优化器会把它们收成半连接，性能别先赌口诀；真正要小心的是 NULL，尤其是 NOT IN。\n\n**语义怎么分。**\n- `x IN (SELECT y FROM t)`：拿 x 去跟集合里的 y 比等值。名单是常量、维表键、枚举时最直观。\n- `EXISTS (SELECT 1 FROM t WHERE t.k = x.k)`：对当前行跑子查询，有一行成立就真，没有就假。相关条件写在子查询里面。\n\n两者都只关心「有没有」，不把右表字段加到结果里。这就是半连接：左表行要么留下，要么丢掉，不会因为右边匹配多行而膨胀。这点和 INNER JOIN 不同。\n\n**NULL 是这题的分水岭。** IN 是等值比较，`x IN (1, NULL)` 在 x=2 时是 UNKNOWN，WHERE 当假丢掉，通常还能接受；`x NOT IN (1, NULL)` 一旦名单里有 NULL，对任何非 NULL 的 x，`(x<>1 AND x<>NULL)` 里后半截永远 UNKNOWN，整段 NOT IN 可能一行都不返回。NOT EXISTS 不受这套三值逻辑坑：子查询没有匹配行就是真。所以「找没有订单的用户」我面试会主动避开 NOT IN：\n```sql\n-- 危险：orders.user_id 有 NULL 时，结果可能是空集\nSELECT u.user_id\nFROM users u\nWHERE u.user_id NOT IN (SELECT user_id FROM orders);\n\n-- 稳：没有匹配行就留下；订单里的 NULL 不会吞掉所有用户\nSELECT u.user_id\nFROM users u\nWHERE NOT EXISTS (\n  SELECT 1 FROM orders o WHERE o.user_id = u.user_id\n);\n\n-- 同样稳：反连接，右表键为空就是没匹配\nSELECT u.user_id\nFROM users u\nLEFT JOIN orders o ON o.user_id = u.user_id\nWHERE o.user_id IS NULL;\n```\n\n**怎么选，按问题和数据选，不按传说选。**\n1. 名单短、是常量或已去重的维表键 → `IN (...)` 最好读。\n2. 相关条件多、只要存在性、可能早停 → `EXISTS`。\n3. 还要带出右表字段、或要一对多明细 → `JOIN`，IN/EXISTS 做不到。\n4. 否定存在 → `NOT EXISTS` 或 `LEFT JOIN … IS NULL`，默认不写 `NOT IN`。\n\n口述收尾：先说「半连接、不膨胀」，再主动提 NOT IN + NULL。面试官要的是你会选语义、会躲三值逻辑，不是背「大表用 EXISTS」。",
+    "followups": [
+      {
+        "q": "优化器真的会把 IN 和 EXISTS 变成一样的计划吗？相关子查询一定慢吗？",
+        "a": "现代优化器经常把 IN / EXISTS 收成 Semi Join / Anti Join，再按统计信息选 hash 或 nest loop，相关子查询不等于逐行跑 N 次。要看 EXPLAIN：是 unnest / semi join，还是 correlated subquery。名单极大且无索引时 IN 可能物化成一张临时表；EXISTS 在 nest loop + 索引下可能真能早停。结论写进 SQL 之前用计划说话，不要用表大小口诀代替。"
+      },
+      {
+        "q": "IN 子查询里有重复值，结果会重复吗？和 JOIN 比呢？",
+        "a": "不会。IN/EXISTS 是半连接，左表一行最多出现一次，右边重复不影响行数。INNER JOIN 会按匹配对数膨胀，一对多就复制左表行。所以「过滤存在性」用 IN/EXISTS；「要右表字段或要一对多」才 JOIN。用 JOIN 做过滤却忘了去重，GMV、人数都会被放大。"
+      },
+      {
+        "q": "IN 和 = ANY 是一回事吗？EXISTS (SELECT *) 和 SELECT 1 有差别吗？还要不要 SELECT DISTINCT？",
+        "a": "`x IN (subq)` 语义上等价于 `x = ANY (subq)`。EXISTS 只看有没有行，SELECT 列表不求值（有的引擎对 SELECT * 还要碰列，习惯写 `SELECT 1` 或 `SELECT NULL`）。子查询里再套 DISTINCT 对 EXISTS 没有意义，对 IN 在部分老优化器上可能少一次去重，现在多数多余。真正要去重的是 JOIN 之后的结果，不是 EXISTS 里面。"
+      }
+    ],
+    "pitfalls": [
+      "用 NOT IN 过滤「没有子表记录」的行，子查询一有 NULL 结果变空集",
+      "用 INNER JOIN 代替 EXISTS 做存在性过滤，一对多把左表行打爆，人数和金额虚高",
+      "凭口诀「小表 IN、大表 EXISTS」不看执行计划，相关子查询被误当成一定慢",
+      "IN 名单来自未去重、未过滤 NULL 的明细，语义和性能一起漂"
+    ],
+    "keywords": [
+      "半连接",
+      "EXISTS",
+      "NOT IN",
+      "NULL 三值逻辑",
+      "反连接"
+    ],
+    "anchor": "IN/EXISTS 是半连接、不膨胀；否定存在用 NOT EXISTS，禁止拿带 NULL 的 NOT IN 当差集。"
   }
 ]
