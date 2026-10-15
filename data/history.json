@@ -250,5 +250,11 @@
     "slug": "sql-exists-vs-in",
     "title": "SQL 里 IN 和 EXISTS 有什么区别？怎么选？碰到 NULL 要注意什么？",
     "category": "SQL"
+  },
+  {
+    "date": "2026-10-15",
+    "slug": "data-lineage",
+    "title": "数据血缘是什么？出数据事故时你怎么用它定影响面？",
+    "category": "数据质量"
   }
 ]
