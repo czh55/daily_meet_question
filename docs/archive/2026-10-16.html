@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>流式计算里迟到数据怎么处理？Watermark 是什么？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-10-16</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#44</span>
+                    <span class="problem-type tag-bigdata">大数据计算</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">流式计算里迟到数据怎么处理？Watermark 是什么？</h1>
+                <div class="topic-row"><span class="topic-chip">事件时间</span><span class="topic-chip">Watermark</span><span class="topic-chip">迟到数据</span><span class="topic-chip">窗口关闭</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>这题考的不是背「Watermark=水位线」，而是候选人会不会用事件时间做窗口：乱序不等于丢数，关窗是一笔完整度与延迟的交易。只说「延迟五分钟」却说不清 watermark 怎么推进、迟到了是更新窗口、侧输出还是补离线分区，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先拆三套时钟：处理时间、摄取时间、事件时间；业务窗口必须跟事件时间。</li><li>定义 Watermark：对「这个事件时间之前基本到齐」的声明，用来关窗，不是简单 sleep。</li><li>说清迟到：事件时间落在当前 watermark 之后关过的窗口里；按允许延迟更新、侧输出或丢弃。</li><li>收口到仓：实时窗口有界，离线按事件日分区 MERGE 补数并重跑下游，两边对账。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：Watermark 是事件时间的「到齐声明」——我相信这个时间点之前的数据基本齐了，可以关窗。迟到不是故障，是关窗之后才来的事实。</p>
+<p><strong>先别用处理时间做业务窗口。</strong> 处理时间是作业墙上的钟，源抖动、反压、重启都会把 10:59 的支付算进 11 点窗口。摄取时间是进入 Kafka/作业的时间，只比处理时间稳一点。GMV、漏斗、会话必须按事件时间（业务发生时刻），乱序是常态。</p>
+<p><strong>Watermark 怎么走。</strong> 常见有界乱序：<code>watermark = max(event_time) - 允许乱序</code>。它是单调不减的事件时间进度，不是「再等 N 分钟」的 sleep。窗口 <code>[10:00, 11:00)</code> 在 watermark ≥ 11:00 时关闭；允许延迟 10 分钟，则 watermark ≥ 11:10 之前仍可更新该窗，之后再来就算迟到。</p>
+<p>伪代码：</p>
+<pre><code># 允许 5 分钟乱序；窗关后再留 10 分钟可更新
+watermark = max_event_time_seen - 5min
+if event_time &gt;= window.end:            # 还没到齐，窗开着
+    accumulate(window)
+elif watermark &lt; window.end + allowed_lateness:
+    update(window)                      # 迟到但还在宽限
+else:
+    side_output(late_event)             # 真正迟到，不要静默丢</code></pre>
+<p><strong>迟到三条路，按代价选：</strong><br>1. <strong>允许延迟内更新</strong>：完整度优先，状态和延迟都变大。<br>2. <strong>侧输出 / 迟到流</strong>：窗结果先发，迟到单独进补数作业，不挡主链路 SLA。<br>3. <strong>丢弃</strong>：只适合监控毛刺，资金/对账禁止静默丢。</p>
+<p><strong>落到数仓。</strong> 实时窗是有界近似；终态在离线。事实表按 <code>event_date</code> 分区，不要按到达日。迟到事件 MERGE 回事件日，再重跑该分区的 DWS/ADS，用主键对账实时与离线。</p>
+<pre><code>-- 迟到仍落回事件日，禁止写进「今天到达」的分区冒充今日增量
+MERGE INTO dwd_pay_txn t
+USING late_pay s
+ON t.pay_id = s.pay_id AND t.dt = s.event_date
+WHEN MATCHED THEN UPDATE SET amount = s.amount, src_lsn = s.src_lsn
+WHEN NOT MATCHED THEN INSERT *;
+-- 然后只重跑 dt = 事件日 的下游，不要全量刷新</code></pre>
+<p>口述收尾：先说「窗口跟事件时间，watermark 是到齐声明」，再主动提允许延迟、侧输出和离线按事件日补数。面试官要的是你会做完整度与延迟的交易，不是会画一条水位线。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">事件时间</span><span class="keyword-chip">Watermark</span><span class="keyword-chip">有界乱序</span><span class="keyword-chip">允许延迟</span><span class="keyword-chip">侧输出</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：允许乱序和允许延迟有什么区别？怎么选，避免窗口永远关不上？</h4>
+            <div class="followup-answer"><p>允许乱序决定 watermark 相对 max(event_time) 落后多少，管的是「正常乱序还当准时」。允许延迟是窗已经根据 watermark 关了之后，还愿意为迟到更新多久，管的是「关窗后的宽限」。乱序设太大，所有窗都晚关，SLA 炸；延迟设太大，状态清不掉会 OOM。按 P95/P99 到达延迟设乱序，按「补一次还是进离线」设延迟；超了走侧输出，不要把宽限开成无限。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：某个 Kafka 分区卡住或源头空闲，watermark 不涨，窗口一直不关，怎么办？</h4>
+            <div class="followup-answer"><p>watermark 通常取各并行源的最小值。一个分区空闲或延迟，全局水位就被它钉住。处理：空闲源发 idleness watermark；按源/分区独立 watermark 再合并时对空闲源设超时；作业层面做 watermark 滞后告警。不能用处理时间去「推」事件时间，那会提前关窗、把还在路上的点变成迟到。根因仍是分区积压或源断了，先修源。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：离线 T+1 已经按事件日跑完，凌晨又来一批昨天的支付，实时数和离线数怎么收口？</h4>
+            <div class="followup-answer"><p>实时窗结果当近似，不回改已经发出的关窗值，迟到进侧输出或补数表。离线以事件日为粒度 MERGE 进昨天分区，按依赖重跑 DWS/ADS，对账用支付主键差集而不是只比总额。对 SLA 要写清：T+1 早上 6 点的数包含「事件在昨天、到达在今天 5 点前」的迟到；5 点后到达进下一次补数，并在看板上标新鲜度。禁止把迟到写进到达日，否则昨天少、今天多，两边都对不齐。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>用处理时间开业务窗口，反压一来整点 GMV 漂到下一个小时</li><li>把 watermark 理解成 sleep(5min)，不理解它是事件时间进度</li><li>真正迟到了静默丢弃，资金和对账对不上还以为实时准</li><li>迟到写入到达日分区，昨天缺、今天多，离线补数补错粒度</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">窗口跟事件时间；Watermark 是到齐声明。迟到不是错误，是关窗后还来的事实，用宽限、侧输出或按事件日补数，禁止静默丢。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

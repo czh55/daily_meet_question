@@ -256,5 +256,11 @@
     "slug": "data-lineage",
     "title": "数据血缘是什么？出数据事故时你怎么用它定影响面？",
     "category": "数据质量"
+  },
+  {
+    "date": "2026-10-16",
+    "slug": "streaming-watermark-late-data",
+    "title": "流式计算里迟到数据怎么处理？Watermark 是什么？",
+    "category": "大数据计算"
   }
 ]
