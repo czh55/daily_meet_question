@@ -262,5 +262,11 @@
     "slug": "streaming-watermark-late-data",
     "title": "流式计算里迟到数据怎么处理？Watermark 是什么？",
     "category": "大数据计算"
+  },
+  {
+    "date": "2026-10-17",
+    "slug": "event-tracking-design",
+    "title": "给一个新功能设计埋点，你会怎么做？怎么保证数据能用来算指标？",
+    "category": "业务分析"
   }
 ]

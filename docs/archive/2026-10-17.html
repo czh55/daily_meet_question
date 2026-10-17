@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>给一个新功能设计埋点，你会怎么做？怎么保证数据能用来算指标？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-10-17</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#45</span>
+                    <span class="problem-type tag-biz">业务分析</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">给一个新功能设计埋点，你会怎么做？怎么保证数据能用来算指标？</h1>
+                <div class="topic-row"><span class="topic-chip">埋点</span><span class="topic-chip">事件模型</span><span class="topic-chip">指标口径</span><span class="topic-chip">漏斗倒推</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>这题考的不是背「谁点了什么」，而是候选人会不会从指标倒推事件：先对齐要算的漏斗/转化，再定对象-行为-属性，最后用 ident、幂等和验收保证口径可复现。只说「前端打个 click」却说不清用户是谁、如何去重、空值怎么拦，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先对齐业务问题和指标：北极星、漏斗步骤、分母分子，再倒推必须采集的事件。</li><li>事件模型说清：谁（ident）在何时对什么对象做了什么行为，带哪些属性。</li><li>落地规范：命名稳定、必填字段、event_id 幂等、版本号、端上与服务端分工。</li><li>上线验收：用 SQL 复现指标、空值/重复告警、和产品走查真实路径。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：埋点是为指标服务的，不是为「多打点」服务的。先定要回答什么问题、指标怎么算，再倒推事件；没有 ident、幂等和验收，上线后一定对不齐。</p>
+<p><strong>先倒推，不要先堆 click。</strong> 假设新功能是「搜索后下单」。先写清漏斗：曝光 → 点击结果 → 进商详 → 提交订单 → 支付成功。每一步写分子分母：点击率分母是曝光 PV 还是去重用户、支付成功以支付单还是订单为准。倒推后，至少要有 <code>search_expose</code>、<code>search_click</code>、<code>order_submit</code>、<code>pay_success</code>，而不是满屏 <code>btn_click</code>。</p>
+<p><strong>事件模型四件套。</strong> 每条事件回答：谁、何时、对什么、做了什么。<br>- 谁：登录用 <code>user_id</code>，未登录用 <code>device_id</code>/<code>anonymous_id</code>，后续用 ident 表打通<br>- 何时：事件时间（用户动作时刻），带时区；不要只用服务端入库时间当业务时间<br>- 对象：<code>item_id</code> / <code>query_id</code> / <code>order_id</code>，保证能和下游事实表 JOIN<br>- 行为：稳定英文事件名，<code>search_click</code> 而不是按钮文案</p>
+<p>公共属性：<code>event_id</code>（客户端生成 UUID，幂等）、<code>event_name</code>、<code>event_time</code>、<code>app_version</code>、<code>os</code>、<code>channel</code>、<code>session_id</code>。业务属性按事件挂，搜索带 <code>query</code>/<code>result_pos</code>，支付带 <code>pay_amount</code>/<code>pay_id</code>。</p>
+<p><strong>端上还是服务端。</strong> 曝光、点击、停留只能端上采；下单、支付、退款以服务端为准，端上只做对照。资金和账号状态禁止只信前端。弱网、重试、WebView 都会漏或重复，所以服务端关键路径必须有一份。</p>
+<p>验收 SQL 要能直接算出漏斗，写不出来说明埋点不够：</p>
+<pre><code>-- 搜索曝光 → 点击 → 支付，按用户去重；event_id 先去重防重试
+WITH e AS (
+  SELECT user_id, event_name, MIN(event_time) AS t
+  FROM dwd_event
+  WHERE dt = '${bizdate}'
+    AND event_id IS NOT NULL
+  GROUP BY user_id, event_name, event_id  -- 同一 event_id 只留一次
+),
+funnel AS (
+  SELECT user_id,
+    MAX(event_name = 'search_expose') AS s1,
+    MAX(event_name = 'search_click')  AS s2,
+    MAX(event_name = 'pay_success')   AS s3
+  FROM e GROUP BY 1
+)
+SELECT COUNT(*) AS expose_uv,
+       SUM(s2) AS click_uv,
+       SUM(s3) AS pay_uv
+FROM funnel WHERE s1 = 1;</code></pre>
+<p>口述收尾：先讲「指标倒推事件」，再主动提 ident、event_id 幂等、关键路径走服务端、上线用 SQL 验收。面试官要的是你能交出可复现口径，不是一张埋点清单。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">指标倒推</span><span class="keyword-chip">事件模型</span><span class="keyword-chip">ident</span><span class="keyword-chip">event_id 幂等</span><span class="keyword-chip">服务端为准</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：前端埋点和服务端埋点怎么选？漏报、作弊怎么处理？</h4>
+            <div class="followup-answer"><p>能看见的交互（曝光、点击、停留、页面深度）只能前端；改变账户或资金状态的（下单、支付、退款、权益发放）以服务端为准。对照用同一业务主键把两端拼起来看差集：前端有、服务端无，多半是漏报或未完成；服务端有、前端无，多半是脚本/接口直调或埋点失败。广告和资金看服务端，产品体验看前端，禁止用前端支付成功直接当 GMV。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：已经上线才发现漏埋或事件名改错了，怎么补救？历史数怎么办？</h4>
+            <div class="followup-answer"><p>先冻结口径：看板标注「某版本前不可比」，不要用残缺数据硬算。能从服务端日志/binlog 回放的（下单、支付）补回离线表；纯前端曝光补不回来，只从修复版本起重新算队列。事件名改了要做映射表，老名新名在 DWD 收成一个标准名，禁止分析 SQL 里写一堆 OR。同时加必填校验和体积监控，空 <code>user_id</code>、空 <code>event_id</code>、量级日环比暴跌要告警，别等业务来问。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：未登录、多端、一个账号多设备，用户 ident 怎么打通，才不会把漏斗算裂？</h4>
+            <div class="followup-answer"><p>每条事件同时带 <code>anonymous_id</code> 和登录后的 <code>user_id</code>。登录成功打一条 bind 事件，离线做 ident 图：匿名→账号→设备。漏斗分析前先映射到分析主体（通常是账号，获客看设备）。切记：绑定前的曝光和绑定后的支付要能连上，否则转化被算成两个用户；一个账号登过家人设备，按设备分析会膨胀，按账号又会合并，口径写进指标说明书。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>先埋一堆按钮 click，指标对不上再补事件，漏斗永远拼不齐</li><li>没有 event_id，弱网重试把一次支付算成三次转化</li><li>用按钮文案或页面标题当事件名，产品改文案口径就断</li><li>资金链路只信前端，作弊和漏报让 GMV 和对账一起炸</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">指标倒推事件，不要事件堆指标；没有 ident、幂等和验收的埋点，算不出可复现的数。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
