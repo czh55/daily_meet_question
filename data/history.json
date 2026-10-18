@@ -268,5 +268,11 @@
     "slug": "event-tracking-design",
     "title": "给一个新功能设计埋点，你会怎么做？怎么保证数据能用来算指标？",
     "category": "业务分析"
+  },
+  {
+    "date": "2026-10-18",
+    "slug": "hive-spark-small-files",
+    "title": "Hive/Spark 里的小文件问题是什么？怎么产生、有什么危害、怎么治理？",
+    "category": "大数据计算"
   }
 ]
