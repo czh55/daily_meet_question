@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据湖、数仓和 Lakehouse 有什么区别？你会怎么选型？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-10-19</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#47</span>
+                    <span class="problem-type tag-dw">数仓建模</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">数据湖、数仓和 Lakehouse 有什么区别？你会怎么选型？</h1>
+                <div class="topic-row"><span class="topic-chip">数据湖</span><span class="topic-chip">数仓</span><span class="topic-chip">Lakehouse</span><span class="topic-chip">开放表格式</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察候选人是否把三者当成「存储形态 + 治理方式」的对比，而不是背产品名。要能按 schema 约束、事务/口径、消费者三条线拆开，并说清 Lakehouse 是在湖上补仓的治理能力，不是自动拥有指标体系。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先拆三个维度：数据形态与 schema、事务/治理/口径、谁来消费。</li><li>数据湖：对象存储 + 原始/半结构化，schema-on-read，弹性便宜，缺统一口径和可靠更新。</li><li>数仓：结构化、schema-on-write、强口径，适合 BI 与稳定报表，入仓成本和弹性差。</li><li>Lakehouse：用 Iceberg/Hudi/Delta 等开放表格式，在湖上补 ACID、时间旅行、schema 演进。</li><li>选型：核心口径进有治理的表；探索、非结构化和回放留在湖；不要把「堆了 Parquet」当成已经有仓。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：湖管原始和弹性，仓管口径和消费；Lakehouse 是在湖的存储上，把仓常用的表治理补回来，不是换了个名字就自动有指标。</p>
+<p><strong>按三条线对比，别按厂商对比。</strong><br>1. Schema：湖是 schema-on-read，文件先落地，读的时候再解释字段；仓是 schema-on-write，进仓前就要对齐类型、主键和分区。前者适合日志、埋点、半结构化 JSON；后者适合 GMV、留存这种必须全公司同一口径的表。<br>2. 治理：湖早期常常是「目录里一堆文件」，更新靠覆盖目录，并发写容易脏读；仓有事务、权限、分层（ODS/DWD/DWS）。Lakehouse 用开放表格式把快照、清单文件、主键 MERGE 放到对象存储上，让同一张表既能批量插入也能按主键更新。<br>3. 消费者：仓服务看板和稳定 SQL；湖服务数据科学、特征回放、探索性分析。Lakehouse 的目标是一份表同时喂 BI 和科学，减少「仓一份、湖一份」的双写。</p>
+<p><strong>Lakehouse 补的是表能力，不是口径。</strong> Iceberg/Hudi/Delta 解决的是：可更新、可时间旅行、schema 演进、并发提交。指标叫什么、分母含不含退款，仍然要在语义层或 DWS 说明书里定义。没有这份说明书，湖仓一体也只是「能 SQL 扫描的数据湖」。</p>
+<p>选型口述：<br>- 公司级核心指标、监管报表 → 有 schema、有主键、有分层的仓或湖仓治理层。<br>- 原始日志、图片/文本、实验回放、尚未定口径的探索 → 湖，保留原始，下游再建模。<br>- 已经用对象存储、又要 MERGE/增量/回溯 → 上开放表格式，而不是再复制一套传统仓。</p>
+<p>一张用户日活表的治理差异，口述级对比：</p>
+<pre><code>-- 湖：按日期目录堆文件，读时自己认字段
+-- s3://lake/ods_event/dt=2026-10-19/*.parquet
+
+-- 仓 / Lakehouse：有表定义、分区和可更新
+MERGE INTO dws_user_daily t
+USING stg_user_daily s
+ON t.user_id = s.user_id AND t.dt = s.dt
+WHEN MATCHED THEN UPDATE SET dau_flag = s.dau_flag
+WHEN NOT MATCHED THEN INSERT *;</code></pre>
+<p>收尾：面试官听的是「你知不知道治理发生在哪一层」。先讲湖和仓的分工，再主动补一句「Lakehouse 解决表格式，不解决北极星口径」。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">schema-on-read</span><span class="keyword-chip">schema-on-write</span><span class="keyword-chip">开放表格式</span><span class="keyword-chip">口径</span><span class="keyword-chip">时间旅行</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：Iceberg、Hudi、Delta 分别解决湖的什么痛点？怎么跟面试官讲差异？</h4>
+            <div class="followup-answer"><p>三者都是开放表格式：用元数据（快照/时间线）管理数据文件，让对象存储上的表具备 ACID、时间旅行、schema 演进。口述抓使用场景即可：Delta 和 Spark/Databricks 生态近；Iceberg 多引擎（Spark/Flink/Trino）读同一张表更常见；Hudi 更强调主键 upsert 和增量消费。选型先看「要不要主键 MERGE、要不要多引擎读」，不要背参数列表。没有表格式时，覆盖写目录无法安全并发，也无法按版本回滚。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：有了 Lakehouse，传统数仓分层（ODS/DWD/DWS）还要不要？</h4>
+            <div class="followup-answer"><p>要。表格式解决的是「这一层怎么存、怎么更、怎么回溯」，分层解决的是「原始、明细、口径」责任分开。ODS 仍保真，DWD 仍对齐实体和脏数据，DWS 仍锁口径。把原始 JSON 直接当 ADS 给业务看，Lakehouse 也不会让口径自动正确。变化的是物理引擎：同一套分层可以都落在对象存储的 Iceberg 表上，而不必再搬进专有仓。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：schema-on-read 和 schema-on-write 怎么选？字段加了怎么办？</h4>
+            <div class="followup-answer"><p>未定口径、生产者经常加字段 → schema-on-read，用半结构化列或 schema 演进把新字段收进来，避免天天改入仓作业。已经对业务承诺的指标表 → schema-on-write，加字段走兼容演进（只加可空列），禁止悄悄改类型、改主键。Lakehouse 的 schema 演进是工具：它让「加列」变安全，但不等于可以在核心指标表上随意改语义。加列后要同步指标说明书和下游 SQL。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>把对象存储上堆了 Parquet 当成已经有数仓治理，没有主键、没有事务、没有口径说明书</li><li>以为上了 Iceberg/Hudi/Delta 就自动有统一指标，把表格式和语义层混为一谈</li><li>原始日志不做建模直接给业务看板，schema-on-read 变成「每个分析师自己猜字段」</li><li>为了湖仓一体再复制一份传统仓，双写两套口径，事故时对不上</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">湖管原始和弹性，仓管口径和消费；Lakehouse 补的是表治理，不是自动有指标。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

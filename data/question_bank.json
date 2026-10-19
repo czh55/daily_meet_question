@@ -2045,5 +2045,56 @@
       "compact"
     ],
     "anchor": "小文件伤的是元数据和调度；分区粒度和输出文件数一起控，读时合并只止痛、不治本。"
+  },
+  {
+    "id": 47,
+    "slug": "dw-lake-warehouse-lakehouse",
+    "title": "数据湖、数仓和 Lakehouse 有什么区别？你会怎么选型？",
+    "category": "数仓建模",
+    "difficulty": "中等",
+    "topics": [
+      "数据湖",
+      "数仓",
+      "Lakehouse",
+      "开放表格式"
+    ],
+    "ready": true,
+    "intent": "考察候选人是否把三者当成「存储形态 + 治理方式」的对比，而不是背产品名。要能按 schema 约束、事务/口径、消费者三条线拆开，并说清 Lakehouse 是在湖上补仓的治理能力，不是自动拥有指标体系。",
+    "framework": [
+      "先拆三个维度：数据形态与 schema、事务/治理/口径、谁来消费。",
+      "数据湖：对象存储 + 原始/半结构化，schema-on-read，弹性便宜，缺统一口径和可靠更新。",
+      "数仓：结构化、schema-on-write、强口径，适合 BI 与稳定报表，入仓成本和弹性差。",
+      "Lakehouse：用 Iceberg/Hudi/Delta 等开放表格式，在湖上补 ACID、时间旅行、schema 演进。",
+      "选型：核心口径进有治理的表；探索、非结构化和回放留在湖；不要把「堆了 Parquet」当成已经有仓。"
+    ],
+    "answer": "一句话：湖管原始和弹性，仓管口径和消费；Lakehouse 是在湖的存储上，把仓常用的表治理补回来，不是换了个名字就自动有指标。\n\n**按三条线对比，别按厂商对比。**\n1. Schema：湖是 schema-on-read，文件先落地，读的时候再解释字段；仓是 schema-on-write，进仓前就要对齐类型、主键和分区。前者适合日志、埋点、半结构化 JSON；后者适合 GMV、留存这种必须全公司同一口径的表。\n2. 治理：湖早期常常是「目录里一堆文件」，更新靠覆盖目录，并发写容易脏读；仓有事务、权限、分层（ODS/DWD/DWS）。Lakehouse 用开放表格式把快照、清单文件、主键 MERGE 放到对象存储上，让同一张表既能批量插入也能按主键更新。\n3. 消费者：仓服务看板和稳定 SQL；湖服务数据科学、特征回放、探索性分析。Lakehouse 的目标是一份表同时喂 BI 和科学，减少「仓一份、湖一份」的双写。\n\n**Lakehouse 补的是表能力，不是口径。** Iceberg/Hudi/Delta 解决的是：可更新、可时间旅行、schema 演进、并发提交。指标叫什么、分母含不含退款，仍然要在语义层或 DWS 说明书里定义。没有这份说明书，湖仓一体也只是「能 SQL 扫描的数据湖」。\n\n选型口述：\n- 公司级核心指标、监管报表 → 有 schema、有主键、有分层的仓或湖仓治理层。\n- 原始日志、图片/文本、实验回放、尚未定口径的探索 → 湖，保留原始，下游再建模。\n- 已经用对象存储、又要 MERGE/增量/回溯 → 上开放表格式，而不是再复制一套传统仓。\n\n一张用户日活表的治理差异，口述级对比：\n```sql\n-- 湖：按日期目录堆文件，读时自己认字段\n-- s3://lake/ods_event/dt=2026-10-19/*.parquet\n\n-- 仓 / Lakehouse：有表定义、分区和可更新\nMERGE INTO dws_user_daily t\nUSING stg_user_daily s\nON t.user_id = s.user_id AND t.dt = s.dt\nWHEN MATCHED THEN UPDATE SET dau_flag = s.dau_flag\nWHEN NOT MATCHED THEN INSERT *;\n```\n\n收尾：面试官听的是「你知不知道治理发生在哪一层」。先讲湖和仓的分工，再主动补一句「Lakehouse 解决表格式，不解决北极星口径」。",
+    "followups": [
+      {
+        "q": "Iceberg、Hudi、Delta 分别解决湖的什么痛点？怎么跟面试官讲差异？",
+        "a": "三者都是开放表格式：用元数据（快照/时间线）管理数据文件，让对象存储上的表具备 ACID、时间旅行、schema 演进。口述抓使用场景即可：Delta 和 Spark/Databricks 生态近；Iceberg 多引擎（Spark/Flink/Trino）读同一张表更常见；Hudi 更强调主键 upsert 和增量消费。选型先看「要不要主键 MERGE、要不要多引擎读」，不要背参数列表。没有表格式时，覆盖写目录无法安全并发，也无法按版本回滚。"
+      },
+      {
+        "q": "有了 Lakehouse，传统数仓分层（ODS/DWD/DWS）还要不要？",
+        "a": "要。表格式解决的是「这一层怎么存、怎么更、怎么回溯」，分层解决的是「原始、明细、口径」责任分开。ODS 仍保真，DWD 仍对齐实体和脏数据，DWS 仍锁口径。把原始 JSON 直接当 ADS 给业务看，Lakehouse 也不会让口径自动正确。变化的是物理引擎：同一套分层可以都落在对象存储的 Iceberg 表上，而不必再搬进专有仓。"
+      },
+      {
+        "q": "schema-on-read 和 schema-on-write 怎么选？字段加了怎么办？",
+        "a": "未定口径、生产者经常加字段 → schema-on-read，用半结构化列或 schema 演进把新字段收进来，避免天天改入仓作业。已经对业务承诺的指标表 → schema-on-write，加字段走兼容演进（只加可空列），禁止悄悄改类型、改主键。Lakehouse 的 schema 演进是工具：它让「加列」变安全，但不等于可以在核心指标表上随意改语义。加列后要同步指标说明书和下游 SQL。"
+      }
+    ],
+    "pitfalls": [
+      "把对象存储上堆了 Parquet 当成已经有数仓治理，没有主键、没有事务、没有口径说明书",
+      "以为上了 Iceberg/Hudi/Delta 就自动有统一指标，把表格式和语义层混为一谈",
+      "原始日志不做建模直接给业务看板，schema-on-read 变成「每个分析师自己猜字段」",
+      "为了湖仓一体再复制一份传统仓，双写两套口径，事故时对不上"
+    ],
+    "keywords": [
+      "schema-on-read",
+      "schema-on-write",
+      "开放表格式",
+      "口径",
+      "时间旅行"
+    ],
+    "anchor": "湖管原始和弹性，仓管口径和消费；Lakehouse 补的是表治理，不是自动有指标。"
   }
 ]
