@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>如何用 SQL 计算用户连续登录天数？最长连续天数怎么求？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-10-20</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#48</span>
+                    <span class="problem-type tag-sql">SQL</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">如何用 SQL 计算用户连续登录天数？最长连续天数怎么求？</h1>
+                <div class="topic-row"><span class="topic-chip">连续登录</span><span class="topic-chip">窗口函数</span><span class="topic-chip">日期差分组</span><span class="topic-chip">Gaps and Islands</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察候选人会不会把「连续日期」从明细里挖出来：先去重到人×日，再用窗口函数造一个不随日期走动的组键，最后按组计数。听的是分组思路，不是背一段 SQL。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先定口径：登录=当日有活跃事件；同一用户同一天多次登录先去重到 user_id + dt。</li><li>一句话点题：连续段 = 把相邻日期收进同一组，组内行数就是连续天数。</li><li>造组键：按用户排日期，用 dt 减去行号（或 RANK），连续日得到同一个 island_id。</li><li>聚合：按 user_id + island_id 计数，得到每段长度；再 MAX 得最长连续天数。</li><li>主动补边界：时区、漏记一天是否算断、要「当前仍在连」还是「历史最长」。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：先把登录压成「人×日」去重表，再给每个用户的日期编号；连续的日期减去行号后差值不变，这个差值就是连续段的组键，组内行数就是连续天数。</p>
+<p><strong>为什么能这么分组。</strong> 假设某用户活跃日是 10-01、10-02、10-03、10-05。按日期排完后行号是 1、2、3、4。日期减行号（用同一起点）：<br>- 10-01 - 1 = 09-30<br>- 10-02 - 2 = 09-30<br>- 10-03 - 3 = 09-30<br>- 10-05 - 4 = 10-01<br>前三天差值相同，是一段；第五天差值变了，新开一段。这就是常说的 gaps and islands：缺口把岛屿切开。</p>
+<p><strong>口述级 SQL（历史最长连续天数）：</strong></p>
+<pre><code>WITH dau AS (
+  SELECT user_id, dt
+  FROM event
+  GROUP BY user_id, dt          -- 当天多次登录先去重
+),
+marked AS (
+  SELECT
+    user_id,
+    dt,
+    DATE_SUB(dt, INTERVAL ROW_NUMBER() OVER (
+      PARTITION BY user_id ORDER BY dt
+    ) DAY) AS island_id
+  FROM dau
+),
+streaks AS (
+  SELECT user_id, island_id, COUNT(*) AS streak_days
+  FROM marked
+  GROUP BY 1, 2
+)
+SELECT user_id, MAX(streak_days) AS max_streak
+FROM streaks
+GROUP BY 1;</code></pre>
+<p><strong>当前仍在连的天数</strong>不是 MAX 历史段，而是：只取每用户 <code>MAX(dt)</code> 那一段，且这段的最大日期必须等于「统计日」（或昨天，看口径）。历史最长和「此刻连了几天」是两个数，面试时先问清楚再写。</p>
+<p>收尾：面试官听的是「去重 → 造不变的组键 → 按组计数」。组键怎么写可以变（日期减行号、日期减 RANK、和前一日差值再累加断点），判断句不变：连续的日期要能被收进同一组。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">去重到人日</span><span class="keyword-chip">日期减行号</span><span class="keyword-chip">island_id</span><span class="keyword-chip">最长连续</span><span class="keyword-chip">当前连续</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：不用日期减行号，还能怎么分组？</h4>
+            <div class="followup-answer"><p>另一种常见写法：<code>LAG(dt)</code> 看是否等于前一日 + 1，不等就标 1 否则标 0，再按用户对这个断点标志 <code>SUM() OVER (ORDER BY dt)</code> 得到组号。和「日期减行号」等价，只是把「缺口」显式标出来。有的引擎日期减整数不方便，用 LAG 更直观。不要同时用两套组键，口径容易对不上。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：业务说「漏一天也算连续」，或者只要近 30 天窗口，怎么改？</h4>
+            <div class="followup-answer"><p>允许间隔 1 天：判断连续的条件改成 <code>dt - prev_dt &lt;= 2</code>，或把缺失日先用日历表补齐再按严格相邻切。近 30 天：先在 dau 里加 <code>dt BETWEEN 统计日-29 AND 统计日</code>，再分组；否则会把窗口外的尾巴拼进来。这两种都要先改口径再改 SQL，不要先改窗口再回头解释数字。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：用户量很大时，这套窗口怎么避免算爆？</h4>
+            <div class="followup-answer"><p>先在上游落一张每日去重活跃表，不要对原始事件反复 <code>GROUP BY user_id, dt</code>。窗口按 user_id 分区，数据要按 user_id、dt 排好或分桶，减少 Shuffle。只要最长天数时，可以在 streaks 之后只留 MAX，不必把每一段都交给下游。统计日任务用分区裁剪，不要全历史重扫。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>同一用户同一天多条登录没去重，连续天数被事件数撑爆</li><li>用全局 ROW_NUMBER 而不是 PARTITION BY user_id，组键串用户</li><li>把历史最长连续和「统计日仍在连」混成一个数</li><li>日期减行号时行号从事件序来、不是从去重后的日期序来，中间有洞也会被收进同一段</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">连续段靠「日期减行号」收进同一组；组内行数是天数，MAX 是历史最长，不是当前还在连。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

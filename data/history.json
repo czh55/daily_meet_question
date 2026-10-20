@@ -280,5 +280,11 @@
     "slug": "dw-lake-warehouse-lakehouse",
     "title": "数据湖、数仓和 Lakehouse 有什么区别？你会怎么选型？",
     "category": "数仓建模"
+  },
+  {
+    "date": "2026-10-20",
+    "slug": "sql-consecutive-active-days",
+    "title": "如何用 SQL 计算用户连续登录天数？最长连续天数怎么求？",
+    "category": "SQL"
   }
 ]
