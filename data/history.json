@@ -286,5 +286,11 @@
     "slug": "sql-consecutive-active-days",
     "title": "如何用 SQL 计算用户连续登录天数？最长连续天数怎么求？",
     "category": "SQL"
+  },
+  {
+    "date": "2026-10-21",
+    "slug": "dw-zipper-table",
+    "title": "数仓里的拉链表是什么？每天怎么更新？和每日快照怎么选？",
+    "category": "数仓建模"
   }
 ]

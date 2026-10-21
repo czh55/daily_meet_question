@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数仓里的拉链表是什么？每天怎么更新？和每日快照怎么选？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-10-21</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#49</span>
+                    <span class="problem-type tag-dw">数仓建模</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">数仓里的拉链表是什么？每天怎么更新？和每日快照怎么选？</h1>
+                <div class="topic-row"><span class="topic-chip">拉链表</span><span class="topic-chip">SCD Type2</span><span class="topic-chip">生效区间</span><span class="topic-chip">每日快照</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察候选人会不会把「要当时状态」落成一张可按日重跑的历史表：开闭区间怎么定、每天和全量快照怎么对、关链与开链怎么写。听的是更新算法和查询约定，不是背 SCD 名词。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>一句话定义：拉链表用 start_dt / end_dt 把同一主键的每一次有效版本串成一条时间轴，当前行 end_dt 用哨兵日期。</li><li>说清约定：半开半闭 [start_dt, end_dt)、当前行 end_dt='9999-12-31'，避免重叠和空洞。</li><li>讲日更四类变化：不变续命、变更关旧开新、新增开链、消失关链。</li><li>对比每日全量快照：拉链省空间、查任意一天稍复杂；快照简单但存储随天数线性涨。</li><li>主动补查询与回刷：as-of 用区间过滤；重跑某日要能按分区或按日覆盖，不能只 append。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：拉链表是把维度（或状态）的每一次变更收成「一段有效期」——同一业务主键多行，靠 start_dt、end_dt 串起来；查某一天的状态，就是找那天落在区间里的那一行。</p>
+<p>它是 SCD Type 2 在离线数仓里的落地形态。用户改城市、商品改类目、订单改状态，分析要「下单当时」而不是「此刻最新」，就必须留历史。拉链把历史留在一张表里，而不是每天拍一张全量照片。</p>
+<p><strong>先把约定钉死，再谈 SQL。</strong> 业界常用半开半闭：<br>- <code>start_dt</code>：本版本生效日（含）<br>- <code>end_dt</code>：本版本失效日（不含）<br>- 当前仍有效：<code>end_dt = '9999-12-31'</code>（或 <code>is_current=1</code>）<br>同一主键任意一天最多命中一行：<code>as_of &gt;= start_dt AND as_of &lt; end_dt</code>。闭区间 <code>end_dt=昨天</code> 也行，但必须全链路同一套，混用就会双计或空洞。</p>
+<p><strong>每天怎么更新（T 日跑批，对照 T 日全量快照）。</strong> 拿「拉链里仍开着的行」（end_dt=9999）和今日全量快照按主键对：<br>1. <strong>两边都在且属性没变</strong>：什么都不改，继续开着。<br>2. <strong>两边都在但属性变了</strong>：旧行关链，<code>end_dt</code> 改成 T（半开闭下今天起不再有效）；再插一行新版本，<code>start_dt=T</code>，<code>end_dt=9999</code>。<br>3. <strong>只在今日快照</strong>：新开链，插入 <code>start_dt=T, end_dt=9999</code>。<br>4. <strong>只在开着的拉链里</strong>（今天没了）：关链，<code>end_dt=T</code>。删除是软关，不是物理删，历史仍可查。</p>
+<p>口述级伪 SQL（日更，分区覆盖当天增量结果再合并）：</p>
+<pre><code>-- 当前开链
+WITH current AS (
+  SELECT * FROM dim_user_zip WHERE end_dt = DATE '9999-12-31'
+),
+-- 今日全量快照 snap(user_id, city, level, dt=T)
+joined AS (
+  SELECT
+    COALESCE(s.user_id, c.user_id) AS user_id,
+    s.user_id IS NOT NULL AS in_today,
+    c.user_id IS NOT NULL AS in_zip,
+    -- 比较业务属性，不要比代理键或加载时间
+    (s.city IS DISTINCT FROM c.city
+     OR s.level IS DISTINCT FROM c.level) AS changed
+  FROM snap s
+  FULL OUTER JOIN current c ON s.user_id = c.user_id
+  WHERE s.dt = DATE '2026-10-21'
+)
+-- 关链：changed 或只在拉链（消失）
+-- 开链：changed 或只在今日（新增）
+-- 不变行原样保留</code></pre>
+<p>落地时不要对整张拉链做行级 UPDATE 当唯一手段：离线仓更稳的是「历史已关闭的行不动 + 当天受影响的开/关链结果用分区或 INSERT OVERWRITE 重写」。这样 T 日任务失败重跑，区间不会被关两次。</p>
+<p><strong>和每日全量快照怎么选。</strong><br>- 每日快照：<code>dim_user_snap PARTITION (dt)</code>，实现简单，查某日就是 <code>WHERE dt=as_of</code>。代价是维度几乎不变也整表存一遍，一年 365 份。<br>- 拉链：空间近似「当前全量 + 变更次数」，适合属性变得慢、又要任意一天状态的维表。查 as-of 是区间过滤，要会写；近线高 QPS 看板仍常先落一份当日快照。<br>口诀：<strong>变得慢、要当时、存得起历史用拉链；变得勤、只要最近几天、查询要极简用快照。</strong> 两者可以并存：拉链是历史真相，近 7 日快照是加速层。</p>
+<p>收尾：面试官听三句话——区间约定、四类变化、快照和拉链的取舍。能把「关旧开新」说成可重跑的日更，这题就过了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">start_dt/end_dt</span><span class="keyword-chip">半开半闭</span><span class="keyword-chip">关链开链</span><span class="keyword-chip">9999-12-31</span><span class="keyword-chip">as-of 查询</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：查「2026-10-01 当时的用户城市」SQL 怎么写？区间为什么要用半开半闭？</h4>
+            <div class="followup-answer"><p>半开闭：<code>WHERE user_id=? AND DATE '2026-10-01' &gt;= start_dt AND DATE '2026-10-01' &lt; end_dt</code>。闭区间就要写成 <code>&lt;= end_dt</code> 且当前行的 end_dt 不能再用 9999 以外的「今天」，变更日当天归属哪一版必须全表一致。半开闭的好处是相邻两段首尾相接、不重叠：旧版 <code>[D1, T)</code>，新版 <code>[T, 9999)</code>，as-of=T 只命中新版。用闭区间却两端都含 T，关联事实表会把同一笔订单翻成两行。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：拉链表怎么按日重跑？中途发现 T-3 的快照错了，怎么回刷？</h4>
+            <div class="followup-answer"><p>拉链的正确性依赖「从某日起的变更序列」。回刷 T-3 不能只改那一天的开链行，而要从 T-3 起重放：用 T-3 的快照把当时开着的链重新对一遍，再依次跑 T-2、T-1、T。工程上会把拉链按 <code>start_dt</code> 分区或保留每日快照作上游，回刷就是从出错日把下游拉链任务重跑到今天。不要在已关闭的历史行上点对点 UPDATE，区间会被改乱。更稳的做法是出错日之后的拉链分区全部覆盖生成。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：事实表关联拉链维度时怎么避免翻倍？代理键还要不要？</h4>
+            <div class="followup-answer"><p>关联必须带时间：<code>fact.event_dt &gt;= dim.start_dt AND fact.event_dt &lt; dim.end_dt</code>，只 join 主键会把所有历史版本都挂上来，GMV 直接翻倍。也可以在事实落表时把当时的维度属性退化进去（下单城市、当时等级），查询不再回挂拉链，这是高 QPS 汇总的常用做法。代理键：每开一条新链生成新的 dim_sk，事实保存 dim_sk，查询就不用写区间。拉链（自然键+区间）和代理键（事实挂 sk）可以同时存在，前者方便回放，后者方便星型查询。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>开闭区间混用，变更日当天同一主键命中两行或零行</li><li>用加载时间或代理键比较「有没有变」，真实业务属性没变却天天开新链</li><li>关联事实表只 join 业务主键，不带 as-of，历史版本把指标撑爆</li><li>对整表行级 UPDATE 关链，任务重跑把 end_dt 改第二次，区间出现空洞</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">拉链用区间留当时状态：半开闭约定死，每天关旧开新，关联事实必须带 as-of。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
