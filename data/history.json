@@ -298,5 +298,11 @@
     "slug": "data-freshness-sla",
     "title": "数仓任务延迟了，你怎么排查？数据新鲜度 SLA 怎么定？",
     "category": "数据质量"
+  },
+  {
+    "date": "2026-10-23",
+    "slug": "columnar-vs-row-storage",
+    "title": "行式存储和列式存储有什么区别？数仓为什么常用 Parquet？",
+    "category": "大数据计算"
   }
 ]
