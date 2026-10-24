@@ -304,5 +304,11 @@
     "slug": "columnar-vs-row-storage",
     "title": "行式存储和列式存储有什么区别？数仓为什么常用 Parquet？",
     "category": "大数据计算"
+  },
+  {
+    "date": "2026-10-24",
+    "slug": "etl-full-vs-incremental",
+    "title": "数仓任务用全量刷新还是增量更新？怎么选、增量怎么保证正确？",
+    "category": "数据工程"
   }
 ]

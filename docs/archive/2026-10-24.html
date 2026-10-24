@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数仓任务用全量刷新还是增量更新？怎么选、增量怎么保证正确？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-10-24</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#52</span>
+                    <span class="problem-type tag-de">数据工程</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">数仓任务用全量刷新还是增量更新？怎么选、增量怎么保证正确？</h1>
+                <div class="topic-row"><span class="topic-chip">全量刷新</span><span class="topic-chip">增量更新</span><span class="topic-chip">分区覆盖</span><span class="topic-chip">水位线</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察候选人会不会把「全量简单、增量省资源」落成可辩护的选型：先看数据变更形态和可重跑窗口，再谈分区覆盖、水位和回放。只背 MERGE/overwrite 名词，却说不清什么表必须全量、增量漏改怎么发现、迟到数据怎么补，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先对变更形态：快照型每天整表替换，还是日志型只来新增/变更；有没有回撤和迟到。</li><li>全量：读上游完整快照，覆盖目标分区或整表，语义简单、好对账，代价是扫描和写出都大。</li><li>增量：按时间水位或变更日志只处理新数据，省资源，但必须处理乱序、回撤、漏抽和重跑。</li><li>正确性三件套：幂等写出（分区覆盖/MERGE）、水位可回放、全量对账兜底。</li><li>选型口诀：小表/维表/口径常变走全量；大事实表按分区增量，定期全量校准。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：全量用完整快照覆盖，换资源买正确和简单；增量只处理新变化，省扫描但要把水位、回放和对账设计进去。没有「永远增量」这回事，只有「日常增量、出错能回放、定期全量校准」。</p>
+<p><strong>先看数据怎么变，再谈刷新方式。</strong><br>- 上游每天给你一张完整快照（用户维、配置表、全量导出）：目标表本质是「昨天那一版长什么样」。这种表全量覆盖最干净。<br>- 上游是业务流水或 CDC（订单、点击、账变）：事实按事件追加，按 <code>dt</code> 或主键变更加增量。<br>- 还有第三种：看起来像流水，但源库会改历史（售后改金额、状态回撤）。增量必须能重放那一段，不能只 append。</p>
+<p><strong>全量刷新。</strong> 读上游当日完整集合，写出覆盖目标。常见落地是分区覆盖：<code>INSERT OVERWRITE TABLE ads_user_daily PARTITION (dt='昨天')</code>，或整表替换后改指针。优点：逻辑等于「昨天快照」，重跑就是再覆盖一次，对账用行数+主键哈希就够。缺点：维表 10 亿、每天只变 0.1%，你仍扫全量、写全量，贵，也容易把高峰窗口打满。</p>
+<p><strong>增量更新。</strong> 只处理「上次水位之后」的变化。水位可以是业务时间（<code>updated_at &gt; last_watermark</code>）、分区日期（只跑 <code>dt=昨天</code>）、或 CDC 位点（LSN/binlog）。写出必须幂等：<br>- 日分区事实：覆盖 <code>dt</code> 分区，不要往分区里 append 出重复文件。<br>- 主键型明细：按主键 <code>MERGE</code>（有则更新、无则插入），回撤用删除标记或版本比较。</p>
+<p>口述级增量骨架：</p>
+<pre><code>-- 日分区事实：只跑昨天，覆盖写出，重跑不双计
+INSERT OVERWRITE TABLE dwd_order_item PARTITION (dt='${bizdate}')
+SELECT order_id, user_id, sku_id, pay_amt, pay_time, ...
+FROM ods_order_item
+WHERE dt = '${bizdate}';
+
+-- 主键维：按更新时间拉增量，MERGE 进当前像
+MERGE INTO dim_user t
+USING (
+  SELECT * FROM ods_user_cdc
+  WHERE updated_at &gt; '${last_watermark}'
+) s
+ON t.user_id = s.user_id
+WHEN MATCHED AND s.updated_at &gt;= t.updated_at THEN UPDATE SET *
+WHEN NOT MATCHED THEN INSERT *;</code></pre>
+<p><strong>增量最容易错的三件事。</strong><br>1. <strong>水位切错</strong>：用处理时间当业务时间，源库卡住时你会以为「没新数据」；或 <code>&gt;</code> 写成 <code>&gt;=</code> 在边界重复、写成 <code>&gt;</code> 又漏掉同一秒多条。约定半开半闭：<code>(last_wm, current_wm]</code>，并持久化水位表。<br>2. <strong>迟到和回撤</strong>：T-2 的订单今天才进 ODS，只跑昨天分区会漏。增量窗口要留 lookback（例如重跑近 3 天分区），或按事件日 MERGE 进历史分区。回撤要版本字段，不能只 insert。<br>3. <strong>漏抽没有报警</strong>：增量成功但少了 10% 变更，调度是绿的。必须有全量对账：主键差集、金额 checksum，按周或按天对热点表。</p>
+<p><strong>怎么选。</strong><br>- 小表、维表、枚举、口径常改的指标表：全量。正确性优先，省下来的钱不够一次事故。<br>- 大事实、按日不可变事件（点击、曝光）：按 <code>dt</code> 增量覆盖。<br>- 会改历史的大表：增量 MERGE + 定期全量校准（周末或月末拿源库快照对一遍）。<br>- 口径重刷、回填 30 天：走分区覆盖回放，不要手写 30 条 UPDATE。</p>
+<p>收尾三句：按变更形态选型、增量必须幂等且可回放、全量对账兜底。能主动说「日常增量、出错回放近 N 天、定期全量校准」，这题就过了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">全量覆盖</span><span class="keyword-chip">增量水位</span><span class="keyword-chip">分区 overwrite</span><span class="keyword-chip">MERGE</span><span class="keyword-chip">定期全量校准</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：一张每天只变 1% 的 10 亿行用户维，为什么很多人仍坚持全量？增量怎么才能稳？</h4>
+            <div class="followup-answer"><p>全量的理由是语义简单：当天快照 = 上游当天导出，对账一行哈希就能做，也不怕漏掉「没进 CDC」的冷更新。10 亿行全量贵，但维表事故比多扫一次更贵。要做增量必须同时具备：可靠 CDC 或 <code>updated_at</code> 被所有更新路径维护、MERGE 按版本去重、以及至少日级全量对账（抽样主键 + 关键属性 checksum）。没有对账的增量，等于默许静默漂移。实践上常见「日增量 + 周全量校准」。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：只覆盖昨天分区的增量任务，T-3 的迟到订单怎么补？</h4>
+            <div class="followup-answer"><p>事件属于 T-3，只跑昨天分区永远写不进去。做法有三：一是任务每次重跑近 N 天分区（lookback），用事件日覆盖历史分区；二是迟到通道单独 MERGE 进对应 <code>dt</code>；三是离线日终用源库/ODS 按事件日再校准一次。Watermark 只保证「晚于 N 天的不再进日常增量」，不保证那些天的数已经对。回补窗口要写进 SLA，并禁止在不完整的历史分区上对外报累计 GMV。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：全量和增量混跑，会不会把数据写花？</h4>
+            <div class="followup-answer"><p>会，如果两套作业写同一目标、互不知道水位。规则：同一张表同一分区同一时刻只允许一种写出者。混跑的正确姿势是「增量日常写、全量校准用同一套覆盖语义」——全量也是 <code>INSERT OVERWRITE</code> 分区或整表 swap，而不是在增量文件旁边再 append 一份。全量校准前先停增量或锁分区，校准后把水位重置到校准快照对应的时间，否则下一次增量会按旧水位重放，把校准结果再打乱。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>把增量理解成「只 insert 不覆盖」，重跑或迟到数据把分区写成双份</li><li>用水位 <code>updated_at &gt; now()-1d</code> 这种滑动窗口，任务延迟时漏抽或重复抽且无法回放</li><li>源库改历史却按「只追加事实」建模，金额回撤永远进不了数仓</li><li>增量任务绿了就对外报数，没有全量对账，静默漏数要到业务对账才爆</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">日常增量、出错回放、定期全量校准；增量省的是扫描，不是正确性，写出必须覆盖或按主键 MERGE。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
