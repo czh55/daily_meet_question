@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL 里怎么去重？DISTINCT、GROUP BY 和 ROW_NUMBER 有什么区别、怎么选？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-10-25</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#53</span>
+                    <span class="problem-type tag-sql">SQL</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">SQL 里怎么去重？DISTINCT、GROUP BY 和 ROW_NUMBER 有什么区别、怎么选？</h1>
+                <div class="topic-row"><span class="topic-chip">去重</span><span class="topic-chip">DISTINCT</span><span class="topic-chip">GROUP BY</span><span class="topic-chip">ROW_NUMBER</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察候选人会不会先钉「重复的定义」再选题：整行完全相同、同一业务键只留一行，还是要带着明细留下最新/最大的那条。只背 DISTINCT，却说不清和 GROUP BY、ROW_NUMBER 的语义差、排序规则变了会留下哪一行，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先钉契约：去的是完全重复行，还是同一业务键下留一条；留下的那条按什么规则（最新、金额最大、任意一行）。</li><li>DISTINCT：对 SELECT 列表整体去重，适合「这些列都一样就算重复」，不指定留哪一行，因为留下来的列值相同。</li><li>GROUP BY：按键折叠成一组，其余列必须聚合；适合只要汇总，不要明细。</li><li>ROW_NUMBER：PARTITION BY 业务键、ORDER BY 规则后取 rn=1；适合「同一键留带上下文的那一行」。</li><li>选型口诀：列都一样用 DISTINCT；要汇总用 GROUP BY；要留一条完整明细用窗口去重。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：先问「什么叫重复、留下哪一行」。整行（或选出的列）完全相同，用 DISTINCT；只要按键汇总，用 GROUP BY；同一业务键要留一条还带着其他字段的明细，用 <code>ROW_NUMBER() OVER (PARTITION BY 键 ORDER BY 规则)</code> 再滤 <code>rn=1</code>。</p>
+<p><strong>三种写法解决的不是同一件事。</strong><br>- <code>SELECT DISTINCT user_id, city</code>：结果集里 <code>(user_id, city)</code> 这对值只出现一次。它不管「这个用户还有没有别的城市」，也不谈最新。<br>- <code>SELECT user_id, COUNT(*) FROM t GROUP BY user_id</code>：一行一个用户，其他列必须 <code>COUNT/SUM/MAX</code>，折叠掉明细。<br>- 窗口去重：同一 <code>user_id</code> 可能有多行城市、时间、来源，你要留下「最近一次登录的那一整行」，DISTINCT 做不到，因为各行其他列不同；GROUP BY 能 <code>MAX(login_time)</code>，但旁边的 city 用 <code>MAX(city)</code> 会拿错行。</p>
+<p><strong>窗口去重的口述级 SQL：</strong></p>
+<pre><code>-- 同一用户留最近一次登录的整行
+WITH ranked AS (
+  SELECT
+    user_id, city, device, login_time,
+    ROW_NUMBER() OVER (
+      PARTITION BY user_id
+      ORDER BY login_time DESC, event_id DESC  -- 并列时再拿一个稳定键
+    ) AS rn
+  FROM login_event
+)
+SELECT user_id, city, device, login_time
+FROM ranked
+WHERE rn = 1;</code></pre>
+<p><code>ORDER BY</code> 就是「留下哪一行」的规则。只写 <code>login_time DESC</code>、同一秒两条，引擎可能今天留 A 明天留 B，任务重跑结果会漂。并列时再加主键或事件 ID。</p>
+<p><strong>和 DISTINCT / GROUP BY 对照着说。</strong></p>
+<pre><code>-- 1) 整行相同：日志重复投递、CDC 重放
+SELECT DISTINCT user_id, city, login_time
+FROM login_event;
+
+-- 2) 只要人数或次数：折叠，不要明细
+SELECT user_id, COUNT(*) AS login_cnt
+FROM login_event
+GROUP BY user_id;
+
+-- 3) 同一用户留一行明细：必须窗口（或等价的 QUALIFY）
+-- Snowflake/部分引擎：
+-- SELECT * FROM login_event
+-- QUALIFY ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY login_time DESC) = 1;</code></pre>
+<p>Hive/Spark SQL 没有标准 QUALIFY 时，用上面的 CTE + <code>rn=1</code>。有的人用 <code>GROUP BY user_id</code> 再 <code>MAX(city)</code>，这不是去重，是「每个字段各自取最大」，行会被拼脏。</p>
+<p><strong>落地场景。</strong><br>- ODS 抽数重复、Kafka 至少一次：先按事件主键 DISTINCT 或按主键 <code>ROW_NUMBER</code> 留最新版本。<br>- 拉链表/维表对账前：同一自然键先按版本号留一行，再和快照比。<br>- 漏斗、留存的人日表：<code>GROUP BY user_id, dt</code> 就够，那天只关心「来没来」，不关心当天第几次。</p>
+<p>收尾：面试官听的是「重复定义 → 留下规则 → 选对工具」。能主动说「GROUP BY 聚合会拆开一行、窗口才能整行留下」，这题就过了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">整行去重</span><span class="keyword-chip">按键留一行</span><span class="keyword-chip">ROW_NUMBER=1</span><span class="keyword-chip">GROUP BY 聚合</span><span class="keyword-chip">稳定排序键</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：为什么不能 GROUP BY user_id，再对 city、device 各自 MAX 来「去重」？</h4>
+            <div class="followup-answer"><p>因为聚合是按列独立算的：<code>MAX(city)</code> 和 <code>MAX(device)</code> 可能来自这个用户的两行不同记录，拼出来的是现实中不存在的一行。要留「某一整行」，必须先用窗口（或主键）把行钉住，再取那一行的全部字段。<code>MAX(login_time)</code> 可以当排序键，但不能单独拿它去拼其他列。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：DISTINCT 和 GROUP BY 列出相同列，执行计划是不是一回事？什么时候 DISTINCT 很贵？</h4>
+            <div class="followup-answer"><p>语义上 <code>SELECT DISTINCT a,b</code> 和 <code>SELECT a,b GROUP BY a,b</code> 结果集相同，优化器也常走同一套聚合/去重算子。贵在「去重键基数」：对超高基数明细做 DISTINCT，等于一次全量聚合，Shuffle 和内存都大。只要人数用 <code>COUNT(DISTINCT user_id)</code> 往往比先 DISTINCT 再 COUNT 更清楚，也方便优化器用近似或两阶段聚合。先过滤分区和无关列，再去重；不要对 <code>SELECT *</code> 整行 DISTINCT 一张宽表。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：ROW_NUMBER、RANK、DENSE_RANK 做去重有什么差别？并列登录怎么留？</h4>
+            <div class="followup-answer"><p>去重要「恰好一行」用 ROW_NUMBER：并列也被强制拆开，<code>rn=1</code> 永远一行。RANK/DENSE_RANK 并列同名次，<code>rank=1</code> 可能多行，去重会漏网。业务允许并列都留（并列冠军）才用 RANK。并列规则必须写进 ORDER BY：时间相同再比 event_id、ingest_time 或来源优先级，保证重跑稳定。CDC 乱序时按业务版本/LSN，不要按处理时间。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>没先定义重复，直接 DISTINCT *，宽表几乎去不掉，还把 Shuffle 打满</li><li>用 GROUP BY 加各列 MAX/MIN 拼「最新一行」，字段来自不同记录，口径脏</li><li>ROW_NUMBER 的 ORDER BY 只写时间，并列时重跑留下不同行，对账对不上</li><li>把 COUNT(DISTINCT user_id) 和 COUNT(*) 在去重前后混用，人数和人日对不齐还硬解释</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">先定「什么算重复、留下哪一行」；列都一样用 DISTINCT，要汇总用 GROUP BY，要留整行明细用 ROW_NUMBER。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

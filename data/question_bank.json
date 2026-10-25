@@ -2351,5 +2351,56 @@
       "定期全量校准"
     ],
     "anchor": "日常增量、出错回放、定期全量校准；增量省的是扫描，不是正确性，写出必须覆盖或按主键 MERGE。"
+  },
+  {
+    "id": 53,
+    "slug": "sql-dedup-distinct-row-number",
+    "title": "SQL 里怎么去重？DISTINCT、GROUP BY 和 ROW_NUMBER 有什么区别、怎么选？",
+    "category": "SQL",
+    "difficulty": "中等",
+    "topics": [
+      "去重",
+      "DISTINCT",
+      "GROUP BY",
+      "ROW_NUMBER"
+    ],
+    "ready": true,
+    "intent": "考察候选人会不会先钉「重复的定义」再选题：整行完全相同、同一业务键只留一行，还是要带着明细留下最新/最大的那条。只背 DISTINCT，却说不清和 GROUP BY、ROW_NUMBER 的语义差、排序规则变了会留下哪一行，这题就浅了。",
+    "framework": [
+      "先钉契约：去的是完全重复行，还是同一业务键下留一条；留下的那条按什么规则（最新、金额最大、任意一行）。",
+      "DISTINCT：对 SELECT 列表整体去重，适合「这些列都一样就算重复」，不指定留哪一行，因为留下来的列值相同。",
+      "GROUP BY：按键折叠成一组，其余列必须聚合；适合只要汇总，不要明细。",
+      "ROW_NUMBER：PARTITION BY 业务键、ORDER BY 规则后取 rn=1；适合「同一键留带上下文的那一行」。",
+      "选型口诀：列都一样用 DISTINCT；要汇总用 GROUP BY；要留一条完整明细用窗口去重。"
+    ],
+    "answer": "一句话：先问「什么叫重复、留下哪一行」。整行（或选出的列）完全相同，用 DISTINCT；只要按键汇总，用 GROUP BY；同一业务键要留一条还带着其他字段的明细，用 `ROW_NUMBER() OVER (PARTITION BY 键 ORDER BY 规则)` 再滤 `rn=1`。\n\n**三种写法解决的不是同一件事。**\n- `SELECT DISTINCT user_id, city`：结果集里 `(user_id, city)` 这对值只出现一次。它不管「这个用户还有没有别的城市」，也不谈最新。\n- `SELECT user_id, COUNT(*) FROM t GROUP BY user_id`：一行一个用户，其他列必须 `COUNT/SUM/MAX`，折叠掉明细。\n- 窗口去重：同一 `user_id` 可能有多行城市、时间、来源，你要留下「最近一次登录的那一整行」，DISTINCT 做不到，因为各行其他列不同；GROUP BY 能 `MAX(login_time)`，但旁边的 city 用 `MAX(city)` 会拿错行。\n\n**窗口去重的口述级 SQL：**\n```sql\n-- 同一用户留最近一次登录的整行\nWITH ranked AS (\n  SELECT\n    user_id, city, device, login_time,\n    ROW_NUMBER() OVER (\n      PARTITION BY user_id\n      ORDER BY login_time DESC, event_id DESC  -- 并列时再拿一个稳定键\n    ) AS rn\n  FROM login_event\n)\nSELECT user_id, city, device, login_time\nFROM ranked\nWHERE rn = 1;\n```\n`ORDER BY` 就是「留下哪一行」的规则。只写 `login_time DESC`、同一秒两条，引擎可能今天留 A 明天留 B，任务重跑结果会漂。并列时再加主键或事件 ID。\n\n**和 DISTINCT / GROUP BY 对照着说。**\n```sql\n-- 1) 整行相同：日志重复投递、CDC 重放\nSELECT DISTINCT user_id, city, login_time\nFROM login_event;\n\n-- 2) 只要人数或次数：折叠，不要明细\nSELECT user_id, COUNT(*) AS login_cnt\nFROM login_event\nGROUP BY user_id;\n\n-- 3) 同一用户留一行明细：必须窗口（或等价的 QUALIFY）\n-- Snowflake/部分引擎：\n-- SELECT * FROM login_event\n-- QUALIFY ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY login_time DESC) = 1;\n```\nHive/Spark SQL 没有标准 QUALIFY 时，用上面的 CTE + `rn=1`。有的人用 `GROUP BY user_id` 再 `MAX(city)`，这不是去重，是「每个字段各自取最大」，行会被拼脏。\n\n**落地场景。**\n- ODS 抽数重复、Kafka 至少一次：先按事件主键 DISTINCT 或按主键 `ROW_NUMBER` 留最新版本。\n- 拉链表/维表对账前：同一自然键先按版本号留一行，再和快照比。\n- 漏斗、留存的人日表：`GROUP BY user_id, dt` 就够，那天只关心「来没来」，不关心当天第几次。\n\n收尾：面试官听的是「重复定义 → 留下规则 → 选对工具」。能主动说「GROUP BY 聚合会拆开一行、窗口才能整行留下」，这题就过了。",
+    "followups": [
+      {
+        "q": "为什么不能 GROUP BY user_id，再对 city、device 各自 MAX 来「去重」？",
+        "a": "因为聚合是按列独立算的：`MAX(city)` 和 `MAX(device)` 可能来自这个用户的两行不同记录，拼出来的是现实中不存在的一行。要留「某一整行」，必须先用窗口（或主键）把行钉住，再取那一行的全部字段。`MAX(login_time)` 可以当排序键，但不能单独拿它去拼其他列。"
+      },
+      {
+        "q": "DISTINCT 和 GROUP BY 列出相同列，执行计划是不是一回事？什么时候 DISTINCT 很贵？",
+        "a": "语义上 `SELECT DISTINCT a,b` 和 `SELECT a,b GROUP BY a,b` 结果集相同，优化器也常走同一套聚合/去重算子。贵在「去重键基数」：对超高基数明细做 DISTINCT，等于一次全量聚合，Shuffle 和内存都大。只要人数用 `COUNT(DISTINCT user_id)` 往往比先 DISTINCT 再 COUNT 更清楚，也方便优化器用近似或两阶段聚合。先过滤分区和无关列，再去重；不要对 `SELECT *` 整行 DISTINCT 一张宽表。"
+      },
+      {
+        "q": "ROW_NUMBER、RANK、DENSE_RANK 做去重有什么差别？并列登录怎么留？",
+        "a": "去重要「恰好一行」用 ROW_NUMBER：并列也被强制拆开，`rn=1` 永远一行。RANK/DENSE_RANK 并列同名次，`rank=1` 可能多行，去重会漏网。业务允许并列都留（并列冠军）才用 RANK。并列规则必须写进 ORDER BY：时间相同再比 event_id、ingest_time 或来源优先级，保证重跑稳定。CDC 乱序时按业务版本/LSN，不要按处理时间。"
+      }
+    ],
+    "pitfalls": [
+      "没先定义重复，直接 DISTINCT *，宽表几乎去不掉，还把 Shuffle 打满",
+      "用 GROUP BY 加各列 MAX/MIN 拼「最新一行」，字段来自不同记录，口径脏",
+      "ROW_NUMBER 的 ORDER BY 只写时间，并列时重跑留下不同行，对账对不上",
+      "把 COUNT(DISTINCT user_id) 和 COUNT(*) 在去重前后混用，人数和人日对不齐还硬解释"
+    ],
+    "keywords": [
+      "整行去重",
+      "按键留一行",
+      "ROW_NUMBER=1",
+      "GROUP BY 聚合",
+      "稳定排序键"
+    ],
+    "anchor": "先定「什么算重复、留下哪一行」；列都一样用 DISTINCT，要汇总用 GROUP BY，要留整行明细用 ROW_NUMBER。"
   }
 ]

@@ -310,5 +310,11 @@
     "slug": "etl-full-vs-incremental",
     "title": "数仓任务用全量刷新还是增量更新？怎么选、增量怎么保证正确？",
     "category": "数据工程"
+  },
+  {
+    "date": "2026-10-25",
+    "slug": "sql-dedup-distinct-row-number",
+    "title": "SQL 里怎么去重？DISTINCT、GROUP BY 和 ROW_NUMBER 有什么区别、怎么选？",
+    "category": "SQL"
   }
 ]
