@@ -316,5 +316,11 @@
     "slug": "sql-dedup-distinct-row-number",
     "title": "SQL 里怎么去重？DISTINCT、GROUP BY 和 ROW_NUMBER 有什么区别、怎么选？",
     "category": "SQL"
+  },
+  {
+    "date": "2026-10-26",
+    "slug": "metric-north-star-guardrail",
+    "title": "什么是北极星指标？怎么和虚荣指标、护栏指标一起用？",
+    "category": "指标体系"
   }
 ]
