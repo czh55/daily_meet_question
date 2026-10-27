@@ -322,5 +322,11 @@
     "slug": "metric-north-star-guardrail",
     "title": "什么是北极星指标？怎么和虚荣指标、护栏指标一起用？",
     "category": "指标体系"
+  },
+  {
+    "date": "2026-10-27",
+    "slug": "ab-peeking-novelty-carryover",
+    "title": "A/B 实验为什么不能天天偷看显著性？新奇效应和残留效应怎么处理？",
+    "category": "A/B实验"
   }
 ]
