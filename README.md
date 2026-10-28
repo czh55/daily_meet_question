@@ -72,6 +72,29 @@ GitHub Pages 指向 `main` 分支的 `/docs` 即可。
 
 ## 题库说明
 
-- 已内置约 20 道完整精讲（SQL / 数仓 / 指标 / 质量 / Spark / A/B / 行为等）
+- 已内置完整精讲（SQL / 数仓 / 指标 / 质量 / Spark / A/B / 行为等）+ 待补题目
 - 另有待补题目：被选中且 `ready=false` 时脚本会跳过出页，由 Agent 按同一结构补齐
 - 选题策略：按 `id` 顺序取未推荐过的 `ready` 题；全部讲完后按「最久未推荐」轮换
+
+## 专题：项目深挖（行为面试）
+
+个人经历与项目深挖是面试场景 ROI 最高的准备方向。题库用 `topics` 含 **「项目深挖」** 的一组题形成专题（`category=行为面试`，id 57–64）：
+
+| slug | 对应准备点 |
+|------|------------|
+| `behavioral-project-deepdive-roi` | 为何深挖 ROI 最高 + 深挖卡准备法 |
+| `behavioral-project-pain-contribution` | 数据基础 / 痛点 / 个人贡献 |
+| `behavioral-project-goal-drive-iterate` | 目标来源 / 驱动 / 迭代 |
+| `behavioral-transfer-people-matter-thing` | 能力迁移：人 / 事 / 物 |
+| `behavioral-fast-fix-to-land` | 快速解决问题并落地 |
+| `behavioral-domain-fundamentals` | 行业 + 技术基本面 |
+| `behavioral-discover-to-ship` | 发现问题 → 推动落地 |
+| `behavioral-team-raci-roadmap-sop` | 全责边界 / 资源 / 上线标准 / roadmap / SOP |
+
+一句话锚点：**用可验证事实证明你在真实约束下能判断与推动，并把能力拆成可迁移的人/事/物。**
+
+指定练习示例：
+
+```bash
+python3 scripts/generate.py --slug=behavioral-project-deepdive-roi --force
+```
