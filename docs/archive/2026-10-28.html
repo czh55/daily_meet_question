@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数仓调度任务的依赖怎么设计？失败了怎么重试，历史数据怎么回填？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-10-28</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#56</span>
+                    <span class="problem-type tag-de">数据工程</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">数仓调度任务的依赖怎么设计？失败了怎么重试，历史数据怎么回填？</h1>
+                <div class="topic-row"><span class="topic-chip">DAG</span><span class="topic-chip">任务依赖</span><span class="topic-chip">分区就绪</span><span class="topic-chip">重试</span><span class="topic-chip">回填</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察候选人会不会把调度当成「cron 到点开跑」，而不是一张带数据就绪语义的 DAG。要讲清：边连的是分区/水位，不是时钟；失败重试必须幂等；回填要控并发、先补上游、给当天 SLA 让路。只背 Airflow 组件名却说不清空跑、脏读和补数顺序，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先画 DAG：节点是作业，边是数据依赖（分区或水位就绪），不是「都 2 点跑」。</li><li>依赖：上游成功 ≠ 数据齐；用分区成功标记 / sensor / 水位线，避免空跑和脏读。</li><li>失败重试：分瞬时失败和数据错误；重试必须幂等（分区覆盖 / MERGE）；毒任务要熔断告警。</li><li>回填：按分区顺着补、先上游后下游、控并发给线上让路，补数窗口可审计。</li><li>收口：调度管的是「数据何时可消费」，不是「进程何时启动」。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：数仓调度不是一堆到点启动的 cron，而是一张 DAG——边表示「这份数据已经可以安全被下游读」。依赖按数据不按时钟，重试必须幂等，回填是按分区重放同一套作业，还得给当天 SLA 让路。</p>
+<p><strong>先画依赖，再谈时间。</strong> 典型链路是 ODS 日分区 → DWD → DWS → ADS。边不是「B 比 A 晚 10 分钟」，而是「A 的 <code>dt=当天</code> 分区写完且质检通过，B 才能起」。实现上常见三种：① 调度器成功边（Airflow 上游 task 绿了才往下）；② 分区就绪标记（Hive/Iceberg 分区存在 + DQ 门禁表）；③ 水位线（流批对账用的 max_event_ts）。只靠错开 cron，上游慢 15 分钟下游就会读到半成品或空分区。</p>
+<p><strong>上游绿了也不等于能跑。</strong> 上游可能「成功但 0 行」（源库空抽、权限丢列）、可能分区晚到、可能质检红了仍被当成成功。下游要认的是<strong>数据契约</strong>：分区存在、行数在历史波动带内、主键不空、金额校验过。Sensor 等的是这张契约，不是 sleep 20 分钟。跨集群、跨团队更要用就绪表，而不是口头「他们一般 3 点跑完」。</p>
+<p><strong>失败怎么重试。</strong> 先分类：<br>1. 瞬时：抢资源、短暂网络、Spot 回收 → 指数退避重试 2～3 次，通常能过。<br>2. 数据/逻辑：主键冲突、schema 对不上、SQL 写错 → 再跑一百次也一样，要熔断、告警、修作业，不要把队列打满。<br>3. 重试前提是<strong>幂等</strong>：同一 <code>dt</code> 再跑结果一致。日批优先分区 overwrite；主键变更用 MERGE；禁止「每次 INSERT 一份」把当天指标写双。超时杀任务后要确认没有半成品文件，小文件和遗留临时路径会让下一次读脏。</p>
+<p><strong>历史怎么回填。</strong> 回填 = 对过去一串分区，用<strong>当前代码</strong>按依赖顺序重放。原则：<br>1. 顺序：先补上游分区，再补直接下游，不要先刷 ADS 再补 ODS。<br>2. 粒度：按天/小时分区循环，而不是一条 SQL 扫两年——失败了好断点续跑，也方便对照每一天的 DQ。<br>3. 并发：回填队列和当天调度隔离或降优先级，限并行，避免把集群和连接数打满、把 SLA 打穿。<br>4. 口径：回填用哪一版代码、哪一版维度要写进工单；补完对账（行数、金额、主键差集），再通知消费方切数。<br>5. 迟到与补数窗口：事实晚到只补相关分区，并看下游是 overwrite 还是 MERGE；拉链表/SCD 回填要按事件时间重放，不能只覆盖最新快照。</p>
+<p>口述例子：订单 DWD 依赖 ODS 和用户维。ODS 3:10 才齐，DWD 若 3:00 死启动就会空跑。某天 Spark 抢资源失败，同一 <code>dt</code> overwrite 重试两次即可；若是金额字段变字符串，应停、修、再跑，而不是重试到上限。业务要补 9 月口径，先锁代码版本，按 9-01→9-30 补 ODS→DWD→DWS，并行度 2，白天让路给当天作业，补完对账 GMV 再开放报表。</p>
+<p>收尾：面试官要听的是「边=数据就绪 + 重试幂等 + 回填按分区且让路」。能主动把 cron 错开、空成功、非幂等重跑、先补下游这几件事当反面教材，这题就过了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">DAG</span><span class="keyword-chip">数据依赖</span><span class="keyword-chip">分区就绪</span><span class="keyword-chip">幂等重试</span><span class="keyword-chip">回填</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：上游任务成功了，但分区是空的或数据迟到，下游要不要跑？</h4>
+            <div class="followup-answer"><p>不要只看调度器绿灯。空分区跑下去，ADS 会把当天写成 0，报表比作业失败更难发现。正确做法：就绪条件带最小行数/波动带、主键非空、与源系统条数对账；不满足就失败或进入「等待迟到」而不是成功往下传。迟到要有 SLA：过了水位仍不齐就告警，允许短窗口内补跑该分区；过了补数窗口按事故处理，并给下游一个明确的缺失标记，而不是默默空跑。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：回填和当天调度抢资源，怎么避免把线上 SLA 打穿？</h4>
+            <div class="followup-answer"><p>把回填放到独立队列/独立 DAG，优先级低于生产，限制并行和槽位数。大回填放低峰，并设「生产任务排队就暂停回填」。分区级断点续跑，失败只重那一天。千万不要在生产 DAG 上直接 <code>--backfill</code> 打满 worker。补数窗口和业务沟通：报表是看补完的数还是继续看旧数，切数时间写进工单。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：重试三次还失败，你怎么定位？怎样证明这个任务可以安全重跑？</h4>
+            <div class="followup-answer"><p>先看失败类型：OOM/shuffle 倾斜走计算侧（分区倾斜键、广播、抽内存）；权限/schema 对不上走源和 DDL；行数突变走数据质量。日志里要对齐 <code>dt</code>、输入路径、输出路径、代码版本。证明幂等：同一分区跑两遍，对账行数、金额、主键差集都是空；输出是 overwrite 或按主键 MERGE，没有无界 INSERT。有副作用的作业（对外发券、写接口）不能靠调度重试，要有幂等键或改成只写仓内表。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>所有任务同一 cron，靠错开几分钟当依赖，上游一延迟就空跑或读半成品</li><li>失败就 INSERT 重跑，不幂等，把当天指标写双份</li><li>回填从下游先补，或并行打满集群把当天任务饿死</li><li>sensor 只 sleep、不查分区标记和 DQ，把「等够久」当成「数据齐了」</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">调度边连的是数据就绪，不是时钟；重试必须幂等，回填先补上游并给当天作业让路。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

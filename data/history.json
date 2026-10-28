@@ -328,5 +328,11 @@
     "slug": "ab-peeking-novelty-carryover",
     "title": "A/B 实验为什么不能天天偷看显著性？新奇效应和残留效应怎么处理？",
     "category": "A/B实验"
+  },
+  {
+    "date": "2026-10-28",
+    "slug": "de-scheduler-dag-backfill",
+    "title": "数仓调度任务的依赖怎么设计？失败了怎么重试，历史数据怎么回填？",
+    "category": "数据工程"
   }
 ]
