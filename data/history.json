@@ -334,5 +334,11 @@
     "slug": "de-scheduler-dag-backfill",
     "title": "数仓调度任务的依赖怎么设计？失败了怎么重试，历史数据怎么回填？",
     "category": "数据工程"
+  },
+  {
+    "date": "2026-10-29",
+    "slug": "behavioral-project-deepdive-roi",
+    "title": "为什么说个人经历和项目深挖是面试 ROI 最高的事？你会怎么系统准备？",
+    "category": "行为面试"
   }
 ]
