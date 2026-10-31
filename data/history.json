@@ -346,5 +346,11 @@
     "slug": "behavioral-project-pain-contribution",
     "title": "介绍一个你最有代表性的项目：数据基础是什么、痛点是什么、你的个人贡献是什么？",
     "category": "行为面试"
+  },
+  {
+    "date": "2026-10-31",
+    "slug": "behavioral-project-goal-drive-iterate",
+    "title": "你们项目目标从哪里来？驱动因素是什么？后来如何迭代？",
+    "category": "行为面试"
   }
 ]
