@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>讲一个你快速定位并解决问题、最终落地的案例。 | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-11-02</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#61</span>
+                    <span class="problem-type tag-behavior">行为面试</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">讲一个你快速定位并解决问题、最终落地的案例。</h1>
+                <div class="topic-row"><span class="topic-chip">项目深挖</span><span class="topic-chip">问题解决</span><span class="topic-chip">落地</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察高压下的诊断顺序与落地完整度：止血→定位→修复→防再发，而不是只炫「我很拼」。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>情境：影响面与时间压力。</li><li>动作：你如何缩小范围、验证假设。</li><li>落地：临时方案与根治方案分别是什么。</li><li>沉淀：监控、SOP、责任人。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>用「影响→止血→定位→根治→沉淀」讲一个真实案例（结构示例）：</p>
+<p>影响：早会核心看板空白/延迟，影响经营决策；窗口只有 1–2 小时。<br>止血：先确认是数据延迟还是口径错误；必要时切备用表或昨日快照，保证会开得下去。<br>定位：按链路分层排查——源头延迟？任务失败？依赖变更？资源排队？用任务日志、分区水印、上游 SLA 快速二分。<br>根治：修失败根因（例如上游字段变更未通知、重试策略不当、倾斜导致超时），补契约与告警。<br>沉淀：加水位监控、变更订阅、失败自动重跑与升级路径；复盘写进 SOP。</p>
+<p>口述重点：你的假设列表与验证顺序，以及「临时可用」和「长期正确」是两步，不是一步凑合到底。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">止血</span><span class="keyword-chip">假设验证</span><span class="keyword-chip">临时vs根治</span><span class="keyword-chip">监控沉淀</span><span class="keyword-chip">时间线</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：如果当时查不出根因怎么办？</h4>
+            <div class="followup-answer"><p>扩大可观测性（埋点/日志/水位），先用补偿任务保证业务可用，同时设时限升级；不要无观察地盲改。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：如何证明你快？</h4>
+            <div class="followup-answer"><p>用时间线：发现→止血→根因确认→修复上线各花了多久；对比历史同类问题耗时。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>只讲熬夜苦劳，没有诊断顺序</li><li>止血当根治，问题反复出现</li><li>没有沉淀，故事停在「修好了」</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">快不是蛮干：先止血保业务，再二分定位，最后用监控与 SOP 防再发。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
