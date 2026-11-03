@@ -364,5 +364,11 @@
     "slug": "behavioral-fast-fix-to-land",
     "title": "讲一个你快速定位并解决问题、最终落地的案例。",
     "category": "行为面试"
+  },
+  {
+    "date": "2026-11-03",
+    "slug": "behavioral-domain-fundamentals",
+    "title": "介绍一下你所在业务的行业基本面，以及你负责方向的技术基本面。",
+    "category": "行为面试"
   }
 ]
