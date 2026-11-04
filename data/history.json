@@ -370,5 +370,11 @@
     "slug": "behavioral-domain-fundamentals",
     "title": "介绍一下你所在业务的行业基本面，以及你负责方向的技术基本面。",
     "category": "行为面试"
+  },
+  {
+    "date": "2026-11-04",
+    "slug": "behavioral-discover-to-ship",
+    "title": "讲一个你从发现问题到推动落地的完整案例。",
+    "category": "行为面试"
   }
 ]
