@@ -376,5 +376,11 @@
     "slug": "behavioral-discover-to-ship",
     "title": "讲一个你从发现问题到推动落地的完整案例。",
     "category": "行为面试"
+  },
+  {
+    "date": "2026-11-05",
+    "slug": "behavioral-team-raci-roadmap-sop",
+    "title": "跨团队协作时，你如何说明全责与边界、拉齐目标、申请资源，并定义上线标准与 SOP？",
+    "category": "行为面试"
   }
 ]
