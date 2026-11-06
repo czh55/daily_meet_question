@@ -382,5 +382,11 @@
     "slug": "behavioral-team-raci-roadmap-sop",
     "title": "跨团队协作时，你如何说明全责与边界、拉齐目标、申请资源，并定义上线标准与 SOP？",
     "category": "行为面试"
+  },
+  {
+    "date": "2026-11-06",
+    "slug": "biz-metric-contribution-decomp",
+    "title": "核心指标突然跌了，你怎么做波动归因和贡献度拆解？",
+    "category": "业务分析"
   }
 ]
