@@ -388,5 +388,11 @@
     "slug": "biz-metric-contribution-decomp",
     "title": "核心指标突然跌了，你怎么做波动归因和贡献度拆解？",
     "category": "业务分析"
+  },
+  {
+    "date": "2026-11-07",
+    "slug": "lake-table-format-iceberg-hudi-delta",
+    "title": "Hive 表和 Iceberg / Hudi / Delta 有什么区别？数仓要上湖表，你会怎么选？",
+    "category": "数据工程"
   }
 ]

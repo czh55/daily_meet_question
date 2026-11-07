@@ -2964,5 +2964,59 @@
       "水平效应"
     ],
     "anchor": "先验真再拆：写成恒等式，用链式贡献让因子加总得回总差额，按贡献最大的切片去验证假设。"
+  },
+  {
+    "id": 66,
+    "slug": "lake-table-format-iceberg-hudi-delta",
+    "title": "Hive 表和 Iceberg / Hudi / Delta 有什么区别？数仓要上湖表，你会怎么选？",
+    "category": "数据工程",
+    "difficulty": "中等",
+    "topics": [
+      "开放表格式",
+      "Iceberg",
+      "Hudi",
+      "Delta Lake",
+      "快照隔离",
+      "隐藏分区"
+    ],
+    "ready": true,
+    "intent": "考察候选人是否把 Hive 表理解成「目录 + 文件列表」的约定，并说清 Iceberg/Hudi/Delta 用元数据层补上了并发写、schema/分区演进和时间旅行。只背三个产品名、说不清快照、隐藏分区和 COW/MOR，这题就浅了。",
+    "framework": [
+      "先定性：Hive 表是目录约定；Iceberg/Hudi/Delta 是带事务语义的开放表格式。",
+      "对照痛点：并发覆盖互相踩、改分区要 squish 目录、schema 演进靠改文件、不能安全时间旅行。",
+      "三者怎么选：批处理与多引擎优先 Iceberg；近实时 upsert/增量消费看 Hudi；Spark 仓深度绑定看 Delta。",
+      "迁移：影子表对账 → 分区回放 → 读切再写切；上线后要 compact 和过期 snapshot，否则元数据会反噬。",
+      "收口：换的是表格式，不是自动拥有指标治理；Lakehouse 架构 ≠ 某张湖表。"
+    ],
+    "answer": "一句话：Hive 表管的是「这张表等于这个目录下的文件」；Iceberg/Hudi/Delta 管的是「这张表等于一份可提交的快照」。数仓要上湖表，本质是给数据湖补上事务、演进和回放，而不是换一个存储品牌。\n\n**Hive 表的痛点要说具体。** 传统 Hive/Spark 外表：分区 = 子目录，清单靠 NameNode 或 MSCK。于是会出现：① 两个作业同时 `INSERT OVERWRITE` 同一分区，后写覆盖先写，没有隔离；② 改分区粒度（天→小时）等于搬家；③ 加字段、改类型要靠约定和下游扛脏数据；④ 想回滚只能靠自己留副本，没有表级时间旅行；⑤ 小文件直接打爆元数据和 listing。Lakehouse 演讲里说的「仓的治理 + 湖的弹性」，缺的就是这一层表格式。\n\n**湖表补的是元数据，不是换一种文件。** 数据仍多是 Parquet。真正变的是：每次提交写一份 snapshot/log（Iceberg manifest、Delta transaction log、Hudi timeline），读的是「某个快照里的文件集合」，而不是「此刻目录里有什么」。好处口述四条就够：\n1. **快照隔离**：写提交前对读者不可见，失败不留半成品。\n2. **隐藏分区**：分区值写在元数据里，目录不必再 `/dt=2026-11-07/` 这种物理布局；查询写 `WHERE dt=` 即可剪枝。\n3. **schema / 分区演进**：加列、改类型、改分区策略走元数据，尽量不重写历史文件。\n4. **时间旅行与增量**：`VERSION AS OF` / 增量 CDC 读变更文件，回放和对账有抓手。\n\n**三者怎么选，别当宗教。**\n- **Iceberg**：开放、多引擎（Spark/Flink/Trino/Hive）最齐，隐藏分区和分区演进成熟，批处理数仓、宽表扫描是默认首选。\n- **Hudi**：upsert、MOR 读最新、增量消费（timeline）更顺，适合近实时入湖、维表频繁变、要对下游发 CDC。\n- **Delta Lake**：和 Databricks/Spark 绑定深，事务日志简单好讲，仓内 Spark 作业占绝对主力时很省心；跨引擎要确认 Iceberg 兼容层是否真能用。\n选型先问三件事：写入是整分区覆盖还是主键 MERGE？读取是多引擎 SQL 还是几乎只有 Spark？要不要对下游流式增量？答完再点名，不要先站队。\n\n**COW 和 MOR 面试几乎必追。** Copy-on-write：更新时重写受影响文件，读路径简单、写放大。Merge-on-read：改动写成 delta/log，读时合并，写快读贵，要靠 compact 把 delta 收进基线。Hudi 把这套讲得最清楚；Iceberg/Delta 也有 equality delete + 合并读取的对应物。近实时更新选 MOR，分析型宽表扫描选 COW 或按时 compact 后的 MOR。\n\n**怎么迁。** 不要「停写两天改 DDL」。做法：① 影子表用同一分区键建湖表，按天回放历史（overwrite 或 MERGE）；② 对账主键差集、金额、行数；③ 先切只读消费（报表/ADS），观察 listing 与扫描耗时；④ 再切写入作业；⑤ 打开 compact、snapshot expire、orphan file 清理，并设保留窗口（例如 7 天时间旅行，不是无限）。并发写入要换成表格式自己的事务提交，而不是多个 overwrite 抢目录。\n\n口述例子：订单明细以前 Hive 天分区，晚上两个回填和一个当天作业互踩，MSCK 还经常丢分区。迁 Iceberg 后按 `dt` 隐藏分区，作业提交快照，回填写另一快照互不挡读；schema 加 `pay_channel` 只更元数据。维表要 10 分钟 upsert，另开 Hudi MOR，下游用增量拉变更。对账一周再下线 Hive 路径。\n\n收尾：面试官要听的是「目录约定 vs 快照元数据 + 按负载选 Iceberg/Hudi/Delta + 迁移分读写切 + compact」。能主动把小文件、无限 snapshot、把 Lakehouse 和表格式混为一谈当反面，这题就过了。",
+    "followups": [
+      {
+        "q": "隐藏分区和 Hive 分区目录有什么差别？查询还能分区裁剪吗？",
+        "a": "Hive 分区是物理目录，裁剪靠路径 listing；改分区等于搬家。隐藏分区把分区列存在表元数据/manifest 里，数据文件路径可以不含分区名，规划器读 manifest 就能跳过无关文件，WHERE 仍然能裁剪。好处是分区演进（天→小时、加一列分区）不必 squish 全表。坑是：过滤条件必须能对上分区列类型和变换（例如按天分区却用时间戳函数包一层，仍可能扫全表）；迁移期若半 Hive 半 Iceberg，两端剪枝行为不一致。"
+      },
+      {
+        "q": "Copy-on-write 和 Merge-on-read 怎么选？compact 不跑会怎样？",
+        "a": "读多写少、扫描宽表：COW 或 MOR 但紧跟 compact，读路径稳定。写多、要点查最新、要对下游发增量：MOR。compact 不跑，MOR 的 delta 文件堆积，读要合并一堆小文件，延迟和 CPU 都会烂，最后比 Hive 小文件还难看。Iceberg 还要定期 expire snapshot、删 orphan，否则元数据清单无限涨，规划比扫描还慢。时间旅行窗口和 compact 节奏要写进运维契约，不能「先上表格式再看」。"
+      },
+      {
+        "q": "上了 Iceberg 就等于上了 Lakehouse 吗？和 Hive 外表还能混用吗？",
+        "a": "不等于。表格式只解决表的事务与演进；Lakehouse 还要口径、权限、质量、调度和消费约定。Hive 外表可以当迁入源，但不要长期双写同一业务主键：两边快照语义不同，对账会永远对不齐。多引擎读同一 Iceberg 表可以，但要锁住 catalog（Hive Metastore / Glue / REST catalog）和 schema 兼容级别，避免 Spark 写的类型 Trino 读崩。指标口径仍然要说明书，表格式不生产 GMV。"
+      }
+    ],
+    "pitfalls": [
+      "把 Iceberg/Hudi/Delta 当成三种存储引擎，说不清数据仍是 Parquet、差在元数据",
+      "以为换表格式就自动没有小文件，不 compact、不过期 snapshot，元数据比数据先炸",
+      "多个作业继续 INSERT OVERWRITE 抢同一路径，没用表格式的提交协议",
+      "把 Lakehouse 架构和某一张湖表划等号，或双写 Hive 与湖表却从不对账"
+    ],
+    "keywords": [
+      "开放表格式",
+      "快照隔离",
+      "隐藏分区",
+      "schema 演进",
+      "COW/MOR",
+      "时间旅行"
+    ],
+    "anchor": "Hive 管目录，湖表管快照：并发、演进、回放挂在元数据上；按负载选 Iceberg/Hudi/Delta，并靠 compact 保读路径。"
   }
 ]
