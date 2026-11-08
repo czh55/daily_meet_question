@@ -394,5 +394,11 @@
     "slug": "lake-table-format-iceberg-hudi-delta",
     "title": "Hive 表和 Iceberg / Hudi / Delta 有什么区别？数仓要上湖表，你会怎么选？",
     "category": "数据工程"
+  },
+  {
+    "date": "2026-11-08",
+    "slug": "metric-semantic-layer",
+    "title": "同一指标三个看板三个数，你怎么治理口径？语义层 / 指标平台解决什么问题？",
+    "category": "指标体系"
   }
 ]
