@@ -400,5 +400,11 @@
     "slug": "metric-semantic-layer",
     "title": "同一指标三个看板三个数，你怎么治理口径？语义层 / 指标平台解决什么问题？",
     "category": "指标体系"
+  },
+  {
+    "date": "2026-11-09",
+    "slug": "dq-data-contract-schema-evolution",
+    "title": "上游加了字段、改了类型，下游作业挂了。数据契约和 Schema 演进你会怎么做？",
+    "category": "数据质量"
   }
 ]
