@@ -406,5 +406,11 @@
     "slug": "dq-data-contract-schema-evolution",
     "title": "上游加了字段、改了类型，下游作业挂了。数据契约和 Schema 演进你会怎么做？",
     "category": "数据质量"
+  },
+  {
+    "date": "2026-11-10",
+    "slug": "ab-cuped-variance-reduction",
+    "title": "实验指标很噪、样本量不够，你会怎么做方差缩减？CUPED 原理和适用条件是什么？",
+    "category": "A/B实验"
   }
 ]

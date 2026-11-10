@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实验指标很噪、样本量不够，你会怎么做方差缩减？CUPED 原理和适用条件是什么？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-11-10</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#69</span>
+                    <span class="problem-type tag-ab">A/B实验</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">实验指标很噪、样本量不够，你会怎么做方差缩减？CUPED 原理和适用条件是什么？</h1>
+                <div class="topic-row"><span class="topic-chip">CUPED</span><span class="topic-chip">方差缩减</span><span class="topic-chip">协变量</span><span class="topic-chip">实验前指标</span><span class="topic-chip">功效</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察候选人会不会在「加流量」之外，用实验前信息把噪声减掉。要讲清 CUPED 的无偏条件（X 不受处理影响）、方差变成 (1-ρ²)、以及什么时候完全没用。只背公式却说不清「实验中的变量不能当 X」、或把 CUPED 当成抬均值的魔法，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先定性：方差大 → 功效不够 → 要么加样本要么减噪；CUPED 是减噪，不是改处理效应。</li><li>原理：用与 Y 相关、但实验前已确定的 X，做 Y' = Y − θ(X − Ē[X])，均值不变、方差乘 (1−ρ²)。</li><li>选 X：优先实验前同口径指标；θ 用对照组或两组合在一起的回归系数。</li><li>适用：老用户、黏性指标、ρ 高；不适用：新客无历史、稀有 0/1、X 会被处理改到。</li><li>收口：先看 X 组间是否平衡，再报 CUPED 后的效应；CUPED 救不了 SRM，也替代不了样本量设计。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：CUPED 用实验前、且与结果相关的协变量，把本来就会发生的那部分波动减掉。处理效应的期望不变，方差大约变成原来的 (1−ρ²)。它是减噪，不是把效果做大。</p>
+<p><strong>先把问题说对。</strong> 指标噪（人均 GMV、时长、次日留存的抽样方差大）时，同样的真实提升 δ，标准误大，p 值出不来。两条路：加样本量（n ≈ 16σ²/δ²），或把 σ 变小。分层随机、更稳的指标、CUPED / 回归调整，都是在动 σ。业务说「再给两周流量」之前，先问：实验前信息用上了没有。</p>
+<p><strong>CUPED 在干什么。</strong> 记 Y 为实验期指标，X 为实验前协变量（最常见：实验前同一窗口的同口径指标）。<br><code>Y' = Y − θ (X − μ_X)</code>，其中 <code>θ = Cov(Y,X) / Var(X)</code>，就是 Y 对 X 的 OLS 斜率，μ_X 用样本均值。<br>因为减去的是常数加 X 的线性项：若 X 在随机化之前就定了，和分组独立，则 E[Y'|T] = E[Y|T]，两组均值差仍是无偏的 ATE。方差：<br><code>Var(Y') = Var(Y) (1 − ρ²)</code>，ρ 是 Y 与 X 的相关系数。ρ=0.5，方差砍掉 25%；ρ=0.7，大约砍一半。功效等价于样本量乘 1/(1−ρ²)。</p>
+<p>口述时画一张图就够：每个用户实验前 GMV 高的，实验中也高。你关心的是「相对自己的基线涨了多少」。CUPED 就是给每个人减掉可被基线预测的那截，剩下的残差更干净，组间对比更灵敏。</p>
+<p><strong>X 怎么选，θ 怎么估。</strong><br>1. 首选：实验开始前 7/14/28 天的同指标（实验前 GMV、实验前活跃天数）。窗口要和 Y 的窗口对齐，别拿去年全年去减本周。<br>2. 次选：稳定画像（城市层级、会员等级、机型），但 ρ 通常不如「过去的自己」。<br>3. θ 用两组数据一起估，或只用对照估；不要按实验组单独估再拿去减，容易把处理效应吸进 θ。<br>4. 可以多个 X，变成多元回归，本质是 CUPAC / 回归调整。机器学习拟合 Ŷ(X) 再残差化，前提仍是特征全部实验前可得。</p>
+<p><strong>什么时候有用，什么时候别用。</strong><br>- 有用：老用户、连续型或高基数指标、个体差异稳定（消费能力、使用习惯）。电商 GMV、广告消耗、人均时长，常常 ρ 在 0.5 以上。<br>- 几乎没用：全新用户没有 X；转化率极低的 0/1 事件，ρ 很小；窗口错位（用上个月 GMV 减本周秒杀）。<br>- 绝对不能用：实验中才产生的变量（是否点击实验按钮、实验期曝光次数）——它可能是处理的结果，减它会把效应减没，这叫 post-treatment bias。</p>
+<p><strong>落地顺序。</strong> 先做 SRM 和 X 的组间平衡（X 的均值差应接近 0，它是随机化的体检）。再出三条数：原始差分、CUPED 差分、方差下降百分比。若 CUPED 后效应方向反了，先查 X 是否泄漏了处理，而不是宣布「协变量魔法」。样本量仍按未减噪的 σ 做保守设计，CUPED 当增益，不当「可以少放一半流量」的借口——ρ 是事后才知道的。</p>
+<p>口述例子：会员页改权益展示，主指标人均月消费，历史周消费与实验周消费 ρ≈0.65，CUPED 后标准误缩小约 24%，两周窗口从「差一点显著」变成到点显著，护栏退款率未动。同一实验若拿「实验期是否打开过权益页」当 X，实验组打开率更高，减完效应接近 0——这是把处理减掉了。</p>
+<p>收尾：面试官要听的是「减噪不改期望 → X 必须实验前 → 方差乘 (1−ρ²) → 先平衡再报数」。能主动说 post-treatment 不能进 CUPED，这题就过了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">CUPED</span><span class="keyword-chip">方差缩减</span><span class="keyword-chip">实验前协变量</span><span class="keyword-chip">ρ²</span><span class="keyword-chip">post-treatment</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：CUPED 和直接做回归 Y ~ T + X、以及分层随机有什么区别？</h4>
+            <div class="followup-answer"><p>大样本下，对 Y 回归 T 和中心化后的 X，得到的 T 系数和 CUPED 的两组均值差是同一件事，CUPED 只是把「先残差再对比」说成实验语言。差别在工程：CUPED 可以先变换指标再交给现成的 t 检验 / 序列平台，不必改分析栈。分层随机是设计阶段按 X 分层再组内随机，从源头保证 X 平衡、并吃掉层内方差；CUPED 是分析阶段。能分层尽量分层，CUPED 仍可在层内再做。分层吃的是离散层，CUPED 更能用连续 X。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：实验组和对照的实验前指标 X 已经不平衡了，还能做 CUPED 吗？</h4>
+            <div class="followup-answer"><p>先当事故：X 在随机化前就该平衡，不平衡说明分流、触发或分析过滤有问题，优先查 SRM 和进组条件。若只是小样本下的随机起伏，CUPED / 回归调整正好把这点基线差减掉，往往比不调整更准。若 X 差很大且伴随 SRM，不要靠 CUPED 粉饰，作废重开。口头原则：CUPED 修的是方差和轻微基线差，不修坏掉的随机化。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：能用实验期的其他指标、或用模型预测值当协变量吗？</h4>
+            <div class="followup-answer"><p>实验期的下游指标不行，除非能证明它完全不受处理影响——这很难。可用的是实验前就能拿到的特征，或用实验前数据训好的模型，在实验开始时打好分，再当 X。CUPAC 就是用机器学习拟合实验前 → 实验期的预测，残差进检验。上线纪律：模型特征和训练窗口全部冻结在开实验之前；禁止用实验期日志重训再回头减。谁能进特征，用一张「实验前快照表」卡死。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>把 CUPED 理解成把指标做大，而不是把方差做小、期望保持不变</li><li>用实验期内才产生的变量当 X，把处理效应减没（post-treatment bias）</li><li>X 组间已严重不平衡或已 SRM，仍拿 CUPED 出全量结论</li><li>按 CUPED 后的方差反推「流量可以砍一半」，用事后 ρ 替代事前样本量设计</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">CUPED 用实验前、且与结果相关的 X 减噪：均值不变，方差乘 (1−ρ²)；处理能改到的变量不能当 X。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
