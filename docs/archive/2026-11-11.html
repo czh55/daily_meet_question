@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hive/Spark 离线数仓和 ClickHouse、Doris、StarRocks 怎么分工？分析加速层你会怎么设计？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-11-11</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#70</span>
+                    <span class="problem-type tag-bigdata">大数据计算</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">Hive/Spark 离线数仓和 ClickHouse、Doris、StarRocks 怎么分工？分析加速层你会怎么设计？</h1>
+                <div class="topic-row"><span class="topic-chip">OLAP</span><span class="topic-chip">ClickHouse</span><span class="topic-chip">Doris</span><span class="topic-chip">StarRocks</span><span class="topic-chip">加速层</span><span class="topic-chip">物化视图</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察候选人会不会把「能算」和「能交互查」拆开。Hive/Spark 擅长大规模 ETL 和可复现批处理，ClickHouse / Doris / StarRocks 擅长低延迟聚合和并发查询。只背引擎名词、说不清数据怎么进加速层、口径怎么和数仓对齐、什么查询不该进 OLAP，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先分层：仓库负责真相和批处理，加速层负责交互查询和并发，不是再造一套数仓。</li><li>对比执行模型：Spark DAG / MapReduce 高吞吐高延迟；CH 列存+稀疏索引；Doris/SR 是 MPP 向量化，JOIN 和并发更强。</li><li>说清同步：谁写、多新鲜、如何保证和 DWS / 语义层同一口径。</li><li>按查询画像选型：明细点查、高基数聚合、实时写入、湖仓外表 + MV。</li><li>收口：OLAP 是缓存和加速，不是第二套指标定义；生命周期和权限跟湖表对齐。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：Hive/Spark（加上 Iceberg/Hudi）保的是真相、批处理和可复现；ClickHouse、Doris、StarRocks 保的是交互查询和并发。分析加速层是数仓之上的缓存，不是第二套口径。</p>
+<p><strong>先把问题拆对，别一上来比跑分。</strong><br>看板要秒出、分析师要拖拽、服务端要高 QPS 聚合——Spark 作业分钟级，Hive 更慢，这不是调参能彻底解决的。反过来，每天几十 TB 的复杂 ETL、多表宽依赖、可回放的历史重跑，不该让 OLAP 扛。面试时先画三层：<br>1. 湖/仓：ODS/DWD/DWS，Iceberg 或 Hive 表，Spark/Flink 写。<br>2. 加速层：按查询模式建的 OLAP 表或物化视图。<br>3. 服务层：极热点再进 KV / 预计算结果表。</p>
+<p><strong>三个引擎别混着背。</strong><br>- Hive/Spark：扫描型批处理。优点是生态、弹性、复杂 DAG、和湖表格式集成；缺点是延迟高、并发差、不适合「人等结果」。<br>- ClickHouse：MergeTree 列存，<code>ORDER BY</code> 当稀疏主键，单表宽表聚合极快，压缩好。短板是大 JOIN、高并发更新、多表星型模型不如 MPP。适合日志、事件、宽表指标。<br>- Doris / StarRocks：MPP + 向量化 + CBO，MySQL 协议，星型/雪花 JOIN、物化视图透明改写更成熟，导入（Broker / Routine / Stream Load）和外表 Catalog 更像数仓加速层。适合多维分析和看板。<br>口述对比一句就够：要单表扫事件，CH 很香；要维度关联 + 高并发看板，Doris/SR 更合适；要可复现的日批和回刷，回 Spark。</p>
+<p><strong>加速层怎么进数据，比选哪个 logo 更重要。</strong><br>常见三条：<br>1. 离线：Spark 把 DWS/ADS 写成 Parquet，Broker Load 或 <code>INSERT INTO olap SELECT * FROM iceberg_catalog.dws_xxx WHERE dt=...</code>。分区对齐 <code>dt</code>。<br>2. 近实时：Kafka → Routine Load / Flink sink；只加速需要秒级的主题，不要全库实时。<br>3. 湖仓一体：OLAP 走 External Catalog 直接查 Iceberg，热点查询再做成异步物化视图落到内表。<br>新鲜度写进 SLA：看板 T+1 就别上实时链路；活动战报才值得 Stream Load。</p>
+<p>口径必须从上面走下来，不能在 OLAP 里「再写一遍 GMV」。过滤条件、成功态、去重键跟语义层或 DWS 说明书一致；OLAP 表是物化，公式的主人不在加速层。</p>
+<p><strong>按查询画像建表，不要一张明细包打天下。</strong><br>- 点查 / 明细：按业务主键或用户 id 排序（CH 的 ORDER BY，Doris 的 Key），避免每次扫分区。<br>- 固定切片聚合：日×渠道×类目做成物化视图或 DWS 再导入，查询打到预聚合。<br>- 即席多维：保留适度明细 + 物化视图改写；维度基数爆炸时先收敛维度，而不是无限加列。<br>- 实时写入：批量（数秒到数分钟一次）比逐条 insert 重要，否则 CH 的 parts、Doris 的 tablet compaction 会被打爆。</p>
+<p>口述例子：交易主题 DWD 在 Iceberg，日批 Spark 出 <code>dws_gmv_channel_di</code>；Doris 对这张表做分区镜像，看板走 MySQL 协议秒出。即席「任意城市×新客」走 Catalog 外表，耗时长但正确；把 Top 20 查询做成 MV。活动日 GMV 战报另开 Kafka → Routine Load，只保留 14 天，过期删分区，湖表仍是 13 个月真相。</p>
+<p>收尾：面试官要听的是「仓保真相、OLAP 保交互 → 引擎按 JOIN/写入/查询画像选 → 同步和口径从 DWS/语义层下来 → 小批量写入和生命周期要管」。能主动说加速层不是第二数仓，这题就过了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">OLAP 加速层</span><span class="keyword-chip">ClickHouse</span><span class="keyword-chip">Doris</span><span class="keyword-chip">StarRocks</span><span class="keyword-chip">MPP</span><span class="keyword-chip">物化视图</span><span class="keyword-chip">口径下推</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：物化视图、DWS 预聚合表、OLAP 内表，三层会不会重复？怎么选落点？</h4>
+            <div class="followup-answer"><p>DWS 解决的是批处理可复现和跨团队复用，算得慢但口径稳；OLAP 内表解决的是并发和延迟；物化视图是引擎内部的查询改写缓存。高频、过滤条件稳定的切片（渠道日、类目日）优先落 DWS，再镜像进 OLAP，两边同一 SQL/同一说明书。真正即席、维度组合不稳定的，用 OLAP MV 或外表，不要为每个临时交叉再做一张 DWS。重复发生在「ADS、Doris、看板各自算 GMV」——这时只留一个公式主人，加速层只存结果。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：为什么不能把 ODS 明细整库倒进 ClickHouse 当数仓用？</h4>
+            <div class="followup-answer"><p>OLAP 不是系统 of record。ODS 有回撤、重复、迟到、宽表无治理字段，倒进去会把 compaction、副本磁盘和主键合并一起打爆，还没有 Spark 那种低成本历史回刷。权限、PII、生命周期在湖表上已有的，在 CH 里往往另做一套就会漏。正确做法：湖表保全量与可重放；加速层只保留查询需要的列、分区和热窗口（比如 90 天），冷数据回湖或对象存储。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：写入很小、查询很散时，ClickHouse 的 parts 和 Doris 的 tablet 会出什么问题？怎么治？</h4>
+            <div class="followup-answer"><p>高频小 insert 会产生海量小 parts / 小版本，合并跟不上，查询要打开过多文件，延迟和内存都会毛刺。治理：客户端攒批（秒级到分钟级）、用 Buffer / Stream Load 的 batch、减少分区和分桶数到「查询能裁剪」而不是「每一种维度都是分区」。已经散了就手动合并、调 compaction 并发，并从源头改写入。分区键用 dt 或小时，不要用用户 id 当分区。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>把 OLAP 当第二数仓，没有 Iceberg/Hive 底表，无法回放和审计</li><li>在加速层重新定义 GMV，和 DWS / 语义层三套口径</li><li>逐条 insert 或按用户 id 分区，打爆 parts / tablet compaction</li><li>用 OLAP 跑非分区全表重刷、超宽无过滤扫描，把批处理需求塞进加速层</li><li>热数据副本和湖表生命周期各管各的，过期删不干净、PII 双份落地</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">数仓保真相和复现，OLAP 保交互和并发；加速层是缓存，不是第二套口径。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

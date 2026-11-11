@@ -412,5 +412,11 @@
     "slug": "ab-cuped-variance-reduction",
     "title": "实验指标很噪、样本量不够，你会怎么做方差缩减？CUPED 原理和适用条件是什么？",
     "category": "A/B实验"
+  },
+  {
+    "date": "2026-11-11",
+    "slug": "olap-clickhouse-doris-vs-hive-spark",
+    "title": "Hive/Spark 离线数仓和 ClickHouse、Doris、StarRocks 怎么分工？分析加速层你会怎么设计？",
+    "category": "大数据计算"
   }
 ]
