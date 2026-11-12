@@ -418,5 +418,11 @@
     "slug": "olap-clickhouse-doris-vs-hive-spark",
     "title": "Hive/Spark 离线数仓和 ClickHouse、Doris、StarRocks 怎么分工？分析加速层你会怎么设计？",
     "category": "大数据计算"
+  },
+  {
+    "date": "2026-11-12",
+    "slug": "sql-sessionization-clickstream",
+    "title": "点击流怎么切成 Session？超时阈值和会话指标你会怎么用 SQL 实现？",
+    "category": "SQL"
   }
 ]

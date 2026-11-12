@@ -3232,5 +3232,60 @@
       "口径下推"
     ],
     "anchor": "数仓保真相和复现，OLAP 保交互和并发；加速层是缓存，不是第二套口径。"
+  },
+  {
+    "id": 71,
+    "slug": "sql-sessionization-clickstream",
+    "title": "点击流怎么切成 Session？超时阈值和会话指标你会怎么用 SQL 实现？",
+    "category": "SQL",
+    "difficulty": "中等",
+    "topics": [
+      "Session 切分",
+      "点击流",
+      "LAG",
+      "超时阈值",
+      "会话指标"
+    ],
+    "ready": true,
+    "intent": "考察候选人会不会把 Session 当成可写进说明书的分析单元，而不是「30 分钟切开」一句口头禅。要能用 LAG 打新会话起点、累计生成 session_id，并说清超时阈值、跨天、无 user_id、会话时长丢最后一页等边界。只会 GROUP BY 用户日期、说不清间隔怎么算，这题就浅了。",
+    "framework": [
+      "先给定义：同一主体、按事件时间排序、相邻间隔不超过超时阈值的连续行为 = 一个 Session。",
+      "SQL 三步：LAG 算间隔 → 间隔超阈值打 is_new → 组内累计和当 session_id。",
+      "阈值不是魔法数：看产品心跳、后台保活、分析粒度；写进指标说明书。",
+      "边界：跨天、时区、匿名设备、登录前后身份合并、时钟回拨、超长挂机。",
+      "指标：会话数、时长（末−首）、深度；最后一页停留要另估，不能假装事件间隔就是停留。"
+    ],
+    "answer": "一句话：Session 是「同一主体、按事件时间排好、相邻间隔不超过超时阈值」的一段连续行为。SQL 用 LAG 找出新会话起点，再累计编号；30 分钟只是默认值，要写进说明书，不是行业真理。\n\n**先定义，再写 SQL。** 主体通常是 `user_id`，没登录用 `device_id`，两者切换要有身份合并规则。时间必须用事件时间 `event_time`，不是入库时间。超时阈值 `gap` 常见 30 分钟：相邻两条事件间隔 > gap，后一条开新会话。这是超时切分，不是「每天 0 点强制切开」——跨 0 点还在刷，算同一会话还是两个，要业务拍板。\n\n**SQL 三步，面试要能默写。** 以事件表 `dwd_app_event` 为例：\n```\nWITH ordered AS (\n  SELECT\n    user_id,\n    event_time,\n    event_name,\n    LAG(event_time) OVER (\n      PARTITION BY user_id ORDER BY event_time, event_id\n    ) AS prev_time\n  FROM dwd_app_event\n  WHERE dt BETWEEN '2026-11-11' AND '2026-11-12'  -- 窗口两侧留缓冲\n),\nflagged AS (\n  SELECT *,\n    CASE\n      WHEN prev_time IS NULL THEN 1\n      WHEN event_time - prev_time > INTERVAL '30' MINUTE THEN 1\n      ELSE 0\n    END AS is_new_session\n  FROM ordered\n),\nsess AS (\n  SELECT *,\n    SUM(is_new_session) OVER (\n      PARTITION BY user_id ORDER BY event_time, event_id\n    ) AS session_seq\n  FROM flagged\n)\nSELECT\n  user_id,\n  CONCAT(user_id, '-', CAST(session_seq AS VARCHAR)) AS session_id,\n  MIN(event_time) AS session_start,\n  MAX(event_time) AS last_event_time,\n  COUNT(*) AS event_cnt,\n  DATE_DIFF('second', MIN(event_time), MAX(event_time)) AS duration_sec\nFROM sess\nGROUP BY user_id, session_seq;\n```\n要点：① `ORDER BY` 加稳定键 `event_id`，同一毫秒多事件不要随机打散；② 窗口要比分析日左右多取一段，避免会话在窗口边缘被截断；③ `session_id` 要可复现，不要用 `UUID()` 每次跑都不一样。\n\n**阈值怎么定，别背 30 分钟。**\n- 内容/资讯短会话多，15～30 分钟常见。\n- 有后台心跳、播放器续播、IM 长连接，要用心跳间隔来定：心跳 5 分钟就别用 2 分钟切，否则一条长播放会被切碎。\n- 分析要看「访次」还是「使用时段」：广告归因常要更短；会员时长、沉浸阅读可以更长。\n- 同一产品对「会话数」和「人均时长」不要各用各的阈值。口径写进说明书：主体、时间键、gap、是否跨天切开、时长含不含末页估算。\n\n**会话指标怎么算。**\n- 会话数：`COUNT(DISTINCT session_id)`，不是 `COUNT(DISTINCT user_id || dt)`。\n- 会话时长：`last_event_time - session_start`。这会**丢掉最后一页停留**——用户看完最后一条没有下一个事件。补救：末事件加一个默认停留（如 30s 封顶）、或用页面卸载/心跳、或只把「有成对进出」的页算停留。面试主动说这点是加分。\n- 会话深度：事件数或 PV；不要把服务端自动心跳算进深度，先过滤事件白名单。\n- 人均会话、会话时长分布：看 P50/P90，不要只报均值——一条挂机 8 小时会把均值拉爆，应用超时把超长会话截断或单独分桶。\n\n**边界要能点名。**\n1. 跨天：超时切 vs 自然日切是两套口径；日活会话数和「自然日访次」不是同一个数。\n2. 时区：`event_time` 统一到业务时区再比间隔。\n3. 身份：登录前 device 一条会话、登录后 user 一条，不合并会重复；合并则要规定「登录事件把前一段匿名会话接上」。\n4. 乱序/迟到：LAG 按处理顺序会切错，必须事件时间排序；迟到超出 watermark 的进补数分区重跑。\n5. 时钟回拨：间隔为负当成 0 或打质量表，不要开一堆 1 秒会话。\n\n口述例子：内容 App 要报「人均会话时长」。先过滤曝光心跳，只留真正交互；gap=30min；时长用末−首，末页补 15s 且 cap 在 60s；超 4 小时的会话打到「挂机」桶不进均值。对账：会话数应约等于 `is_new_session` 之和，首事件数 = 会话数。\n\n收尾：面试官要听的是「定义 → LAG 打点 → 累计编号 → 阈值进说明书 → 时长会丢末页」。能主动说窗口留缓冲和禁止 UUID 当 session_id，这题就过了。",
+    "followups": [
+      {
+        "q": "只要「每个用户每天一个会话」或用页面 referrer，和超时切分有什么差别？",
+        "a": "按天折叠是访次/日活的粗口径，会把早上通勤和晚上刷盘合成一个会话，时长和路径都脏。Referrer/UTM 切的是流量来源，一次打开里点了站外回跳会被切碎，适合归因不是适合行为时长。超时切分看的是使用连续性。三种口径可以并存，但名字不能都叫 Session；说明书里写「30min 超时会话」还是「自然日访次」。"
+      },
+      {
+        "q": "流式场景（Flink/Spark Streaming）怎么切 Session？和离线 SQL 对得齐吗？",
+        "a": "流式用会话窗口或 `mapGroupsWithState`/`sessionWindow`：按 key 持有最后事件时间，超过 gap 关窗输出。要对齐离线：必须同一主体、同一事件白名单、同一 gap、同一事件时间语义。差别在迟到：流式有 watermark，关窗后迟到事件要么侧输出要么丢；离线是整天重跑，晚到的也能进会话。对账不要拿「实时会话数」直接对「T+1 重跑」，应允许 watermark 窗口内的差，并在离线用同一规则回放补一刀作为真值。"
+      },
+      {
+        "q": "会话时长均值被挂机用户拉爆，或最后一页时长缺失，你怎么改口径？",
+        "a": "均值旁路：同时报 P50/P90，超阈值（如 4h）截断或分桶。挂机检测：连续心跳但无交互，不延长会话，或把心跳从深度里剔除、只用来保活。末页：用 pagehide/heartbeat 的 last_seen；没有就加 cap 默认停留，并在说明书声明「时长含末页估算 Xs，上限 Ys」。不要把默认停留设成 gap 本身——那会让每个会话都凭空多 30 分钟。"
+      }
+    ],
+    "pitfalls": [
+      "把 30 分钟当真理，不看心跳间隔和分析目的，会话数和时长各用各的阈值",
+      "ORDER BY 只有时间没有稳定键，同一毫秒事件每次切分结果不同",
+      "分析窗口不留缓冲，日界上的会话被截成两截，对不齐前后两天",
+      "用 UUID 生成 session_id，任务重跑对不上；或用入库时间代替事件时间",
+      "用末事件减首事件当停留总时长，却不声明丢掉了最后一页",
+      "把心跳、曝光打进会话深度，或把负间隔当成新会话刷出大量 1 秒碎片"
+    ],
+    "keywords": [
+      "Session",
+      "超时阈值",
+      "LAG",
+      "is_new_session",
+      "事件时间",
+      "末页停留"
+    ],
+    "anchor": "Session 是同一主体、间隔不超过阈值的连续行为：LAG 打起点再累计编号，时长用末减首并声明末页，阈值写进说明书。"
   }
 ]
