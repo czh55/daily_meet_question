@@ -424,5 +424,11 @@
     "slug": "sql-sessionization-clickstream",
     "title": "点击流怎么切成 Session？超时阈值和会话指标你会怎么用 SQL 实现？",
     "category": "SQL"
+  },
+  {
+    "date": "2026-11-13",
+    "slug": "dw-conformed-dimension-bus-matrix",
+    "title": "什么是一致性维度和总线矩阵？跨数据域复用维度时怎么保证口径不漂？",
+    "category": "数仓建模"
   }
 ]
