@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GMV 可以按天、按部门 SUM，转化率和库存为什么不行？可加、半可加、不可加指标怎么汇总？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-11-14</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#73</span>
+                    <span class="problem-type tag-metric">指标体系</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">GMV 可以按天、按部门 SUM，转化率和库存为什么不行？可加、半可加、不可加指标怎么汇总？</h1>
+                <div class="topic-row"><span class="topic-chip">可加指标</span><span class="topic-chip">半可加</span><span class="topic-chip">不可加</span><span class="topic-chip">比率汇总</span><span class="topic-chip">COUNT DISTINCT</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察候选人会不会按可加性决定报表怎么汇总，而不是看见数字就 SUM、看见比率就 AVG。要能分清可加（GMV）、半可加（库存/余额）、不可加（转化率、客单价、DAU、UV），并说出比率必须「先加分子分母再相除」。只会背「别直接平均转化率」、说不清库存为什么不能按天加、去重人数跨切片对不上，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先给定义：可加=沿任意维 SUM 仍有业务含义；半可加=只沿部分维可加；不可加=SUM/AVG 都会撒谎，要另给汇总规则。</li><li>可加：金额、订单数、PV、成功笔数；跨天、跨部门、跨渠道都能加，是贡献度拆解的底盘。</li><li>半可加：时点快照（库存、余额、在投人数）可沿商品/仓加，不能沿时间加；时间维用期末、均值或独立快照。</li><li>不可加：比率、均值、COUNT DISTINCT、DAU。正确做法是保留原子分子分母，汇总时 ratio-of-sums，或按说明书重算去重。</li><li>收口：指标说明书必须写「可加性 + 汇总函数」；语义层禁止对不可加字段暴露默认 SUM。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：先问这个数「沿哪个维度相加还有没有意义」。GMV、订单数是可加的，库存是半可加的，转化率、客单价、DAU、UV 是不可加的——报表该 SUM、该取期末、还是先加分子分母再相除，全写在说明书里，不能靠看板默认聚合。</p>
+<p><strong>可加（Additive）。</strong> 沿任意维度 SUM 都讲得通：GMV、支付成功金额、订单数、PV、曝光次数、退款笔数。月 GMV = 各天 GMV 之和，全国 = 各部门之和。贡献度、对账、OLAP 下钻都依赖这一层。面试补一句：可加不等于「永远加正数」——退款可以是负事实，仍然可加，加完是净额。</p>
+<p><strong>半可加（Semi-additive）。</strong> 只对部分维度可加。典型是<strong>时点快照</strong>：库存件数、账户余额、在途订单、在投用户数。沿商品、仓库、账户 SUM 有意义（今天全仓库存 = 各仓之和）；沿<strong>日期 SUM 没有意义</strong>——把 30 天库存加起来不是「月库存」，是把同一批货数了 30 遍。时间维正确汇总：期末（最后一天）、期初、日均（先按天取快照再平均）。余额类同：不能把每天余额加出「月余额」。</p>
+<p><strong>不可加（Non-additive）。</strong> SUM 和简单 AVG 都会错。<br>1. <strong>比率 / 均值</strong>：转化率 = 订单数 / UV，客单价 = GMV / 订单数，CTR = 点击 / 曝光。部门 A 转化 10%、B 转化 2%，不能 (10%+2%)/2 当公司转化——流量大的组权重大。正确是 <strong>ratio of sums</strong>：<code>SUM(订单)/SUM(UV)</code>，不是 <code>AVG(各组转化率)</code>。加权平均可以，权重必须是分母。<br>2. <strong>COUNT DISTINCT / UV / DAU</strong>：人在渠道 A 和渠道 B 都出现过，部门 SUM(UV) 会重复计数，加总 &gt; 公司 UV。跨天 SUM(DAU) 更不是 MAU。要公司级去重，必须回到原子明细或 bitmap/HLL 按说明书重算，不能加汇总表。<br>3. <strong>分位数、留存率、渗透率</strong>：P90 不可加；留存是队列比率，不能把各天留存加起来。</p>
+<p>SQL 里原子层要留分子分母，禁止过早写成一个百分比列让下游乱 SUM：</p>
+<pre><code>-- 原子（可加）
+SELECT dt, channel, SUM(gmv) AS gmv, COUNT(*) AS orders, COUNT(DISTINCT user_id) AS uv
+FROM dwd_pay_success
+GROUP BY dt, channel;
+
+-- 汇总到天：比率必须重算；UV 不能 SUM
+SELECT dt,
+       SUM(gmv) AS gmv,
+       SUM(orders) AS orders,
+       SUM(gmv) / NULLIF(SUM(orders), 0) AS aov,          -- 客单价：ratio of sums
+       SUM(orders) * 1.0 / SUM(uv) AS cvr_wrong          -- 错：channel UV 相加有重复
+FROM channel_daily
+GROUP BY dt;</code></pre>
+<p>公司转化、公司 UV 要回明细或用 HyperLogLog/bitmap 按 dt 去重。渠道日报里的 UV 只保证「渠道内去重」，跨渠道不可加，说明书里写「半可加/不可加」，看板别开合计行。</p>
+<p>口述例子：销售周报各部门自己算转化率，CEO 把 8 个部门转化率一平均，说公司转化 4.2%；你用全公司订单/全公司 UV 算出 3.1%。差在流量最大的渠道转化低，简单平均给了小部门同等权重。库存周报把 7 天库存 SUM 成「周库存 70 万件」，其实每天大约 10 万，应报期末 10.2 万、日均 9.8 万。</p>
+<p>收尾：面试官要听的是「可加 SUM、半可加时点用期末/均值、不可加保留分子分母做 ratio-of-sums，去重人数跨切片要重算」。能主动禁止语义层对比率列默认 SUM，这题就过了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">可加</span><span class="keyword-chip">半可加</span><span class="keyword-chip">不可加</span><span class="keyword-chip">ratio of sums</span><span class="keyword-chip">COUNT DISTINCT</span><span class="keyword-chip">期末库存</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：看板已经存了每天的转化率，业务要看「周转化」，AVG 七天可以吗？和加权有什么差别？</h4>
+            <div class="followup-answer"><p>几乎都不该 AVG。七天转化率简单平均是「每天同等权重」，周一 UV 10 万、周日 UV 1 万，周日会把周转化拉偏。正确周转化 = 周订单合计 / 周 UV 合计（周 UV 还得按周去重，不是 SUM(DAU)）。若坚持「日转化的平均」必须声明是算术平均、给的是日波动中枢，不是真实转化；加权平均用每天 UV 当权重，结果接近但在去重和跨天重复访问上仍不等于周口径。说明书里「周转化」只保留一种：分子分母按周重算。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：库存、余额这类半可加事实，模型上怎么存、报表怎么配聚合？</h4>
+            <div class="followup-answer"><p>用周期快照事实表，粒度是「日×商品×仓」或「日×账户」，每天一张切片，度量是时点值。查询默认 <code>dt = 期末</code> 或 <code>argMax(qty, dt)</code>；日均库存是先按天取快照再 AVG，仍不要 SUM 日期。物化汇总表可以预计算「仓合计、类目合计」这些可加维，时间维只存期末和日均两列，禁止存「月库存合计」。SCD/拉链表管的是维度历史，不能拿来当库存可加的借口。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：COUNT DISTINCT 跨渠道对不上，有哪些工程手段？近似去重能当可加指标用吗？</h4>
+            <div class="followup-answer"><p>精确：回到原子事件按目标粒度重算；或用 Roaring Bitmap 存每天/每渠道的用户集合，公司级是按位或，不是 SUM。近似：HLL 可 merge，合并后仍是近似基数，误差要写进说明书，低基数渠道别当精确人数。两种都不是「把各渠道 UV 加起来」。预聚合表要同时保留可加原子（订单、GMV、曝光）和可合并的去重结构；只留一个 UV 整数的汇总表，上卷必然错。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>对转化率、CTR、客单价做 SUM 或简单 AVG，不按分母加权也不回原子层重算</li><li>把每天 DAU 加总当 MAU，或把各渠道 UV 加总当公司 UV</li><li>库存、余额沿日期 SUM，把时点快照当成期间发生额</li><li>ADS 过早只留一个百分比列，下游除了乱聚合没有分子分母</li><li>语义层/OLAP 对所有数值列默认 SUM，不可加指标没有单独的聚合规则</li><li>贡献度拆解拿不可加指标直接当因子相加，加总对不上总差额还四舍五入糊弄</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">可加才能 SUM，半可加时点用期末或日均，比率先加分子分母再相除，去重人数跨切片必须重算。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

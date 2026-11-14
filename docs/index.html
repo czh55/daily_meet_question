@@ -15,7 +15,7 @@
             <a href="index.html" class="logo">
                 <span class="logo-icon">&#x25C7;</span>
             </a>
-            <span class="header-date">2026-11-13</span>
+            <span class="header-date">2026-11-14</span>
         </div>
     </header>
 
@@ -27,14 +27,14 @@
 
         <div class="today-problem">
             <div class="today-label">&#x1F4C5; 今日推荐</div>
-            <h2><a href="archive/2026-11-13.html">#72 什么是一致性维度和总线矩阵？跨数据域复用维度时怎么保证口径不漂？</a></h2>
+            <h2><a href="archive/2026-11-14.html">#73 GMV 可以按天、按部门 SUM，转化率和库存为什么不行？可加、半可加、不可加指标怎么汇总？</a></h2>
             <div class="today-meta">
-                <span class="problem-type tag-dw">数仓建模</span>
+                <span class="problem-type tag-metric">指标体系</span>
                 <span class="problem-difficulty difficulty-medium">中等</span>
             </div>
             <p style="margin-top:12px; color:var(--text-secondary); font-size:0.9rem;">
-                考察候选人会不会把「用户、商品、渠道」做成全仓共用的一张真相维，而不是每个主题各写各的 dim_user。只会背星型模型、说不清总线矩阵怎么画、自然键对不上、SCD 策略各域各搞，跨域 GMV 和用户数对不齐，这题就浅了。...
-                <a href="archive/2026-11-13.html">[查看完整讲解]</a>
+                考察候选人会不会按可加性决定报表怎么汇总，而不是看见数字就 SUM、看见比率就 AVG。要能分清可加（GMV）、半可加（库存/余额）、不可加（转化率、客单价、DAU、UV），并说出比率必须「先加分子分母再相除」。只会背「别直接平均转化率」、说不清库存为什么不能按天加、去重人数跨切片对不上，这题就浅了。...
+                <a href="archive/2026-11-14.html">[查看完整讲解]</a>
             </p>
         </div>
 
@@ -42,6 +42,12 @@
             <h2>&#x1F4DA; 往期归档</h2>
             <div class="archive-grid">
                 <div class="archive-item">
+            <a href="archive/2026-11-13.html">
+                <div class="archive-date">2026-11-13</div>
+                <div class="archive-title">什么是一致性维度和总线矩阵？跨数据域复用维度时怎么保证口径不漂？</div>
+                <span class="archive-type problem-type tag-dw">数仓建模</span>
+            </a>
+        </div><div class="archive-item">
             <a href="archive/2026-11-12.html">
                 <div class="archive-date">2026-11-12</div>
                 <div class="archive-title">点击流怎么切成 Session？超时阈值和会话指标你会怎么用 SQL 实现？</div>
@@ -516,19 +522,19 @@
             </ul>
         </div><div class="type-card">
             <div class="type-card-header">
+                <span class="problem-type tag-metric">指标体系</span>
+                <span class="type-count">6 题</span>
+            </div>
+            <ul class="type-problem-list">
+                <li><a href="archive/2026-11-14.html">GMV 可以按天、按部门 SUM，转化率和库存为什么不行？可加、半可加、不可加指标怎么汇总？</a><span class="type-item-date">2026-11-14</span></li><li><a href="archive/2026-11-08.html">同一指标三个看板三个数，你怎么治理口径？语义层 / 指标平台解决什么问题？</a><span class="type-item-date">2026-11-08</span></li><li><a href="archive/2026-10-26.html">什么是北极星指标？怎么和虚荣指标、护栏指标一起用？</a><span class="type-item-date">2026-10-26</span></li><li><a href="archive/2026-10-10.html">同比和环比怎么定义？用 SQL 怎么算、口径上有哪些坑？</a><span class="type-item-date">2026-10-10</span></li><li><a href="archive/2026-09-25.html">DAU/MAU 如何定义？有哪些坑？</a><span class="type-item-date">2026-09-25</span></li><li><a href="archive/2026-09-08.html">如果让你从零搭一套产品指标体系，你会怎么设计？</a><span class="type-item-date">2026-09-08</span></li>
+            </ul>
+        </div><div class="type-card">
+            <div class="type-card-header">
                 <span class="problem-type tag-ab">A/B实验</span>
                 <span class="type-count">5 题</span>
             </div>
             <ul class="type-problem-list">
                 <li><a href="archive/2026-11-10.html">实验指标很噪、样本量不够，你会怎么做方差缩减？CUPED 原理和适用条件是什么？</a><span class="type-item-date">2026-11-10</span></li><li><a href="archive/2026-10-27.html">A/B 实验为什么不能天天偷看显著性？新奇效应和残留效应怎么处理？</a><span class="type-item-date">2026-10-27</span></li><li><a href="archive/2026-10-13.html">A/B 实验里什么是 SRM？发现分流比例和设计不一致，你会怎么排查？</a><span class="type-item-date">2026-10-13</span></li><li><a href="archive/2026-09-27.html">A/B 实验样本量怎么估算？</a><span class="type-item-date">2026-09-27</span></li><li><a href="archive/2026-09-09.html">A/B 实验的基本原理是什么？如何判断实验是否显著？</a><span class="type-item-date">2026-09-09</span></li>
-            </ul>
-        </div><div class="type-card">
-            <div class="type-card-header">
-                <span class="problem-type tag-metric">指标体系</span>
-                <span class="type-count">5 题</span>
-            </div>
-            <ul class="type-problem-list">
-                <li><a href="archive/2026-11-08.html">同一指标三个看板三个数，你怎么治理口径？语义层 / 指标平台解决什么问题？</a><span class="type-item-date">2026-11-08</span></li><li><a href="archive/2026-10-26.html">什么是北极星指标？怎么和虚荣指标、护栏指标一起用？</a><span class="type-item-date">2026-10-26</span></li><li><a href="archive/2026-10-10.html">同比和环比怎么定义？用 SQL 怎么算、口径上有哪些坑？</a><span class="type-item-date">2026-10-10</span></li><li><a href="archive/2026-09-25.html">DAU/MAU 如何定义？有哪些坑？</a><span class="type-item-date">2026-09-25</span></li><li><a href="archive/2026-09-08.html">如果让你从零搭一套产品指标体系，你会怎么设计？</a><span class="type-item-date">2026-09-08</span></li>
             </ul>
         </div><div class="type-card">
             <div class="type-card-header">

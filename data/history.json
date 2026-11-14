@@ -430,5 +430,11 @@
     "slug": "dw-conformed-dimension-bus-matrix",
     "title": "什么是一致性维度和总线矩阵？跨数据域复用维度时怎么保证口径不漂？",
     "category": "数仓建模"
+  },
+  {
+    "date": "2026-11-14",
+    "slug": "metric-additive-semi-nonadditive",
+    "title": "GMV 可以按天、按部门 SUM，转化率和库存为什么不行？可加、半可加、不可加指标怎么汇总？",
+    "category": "指标体系"
   }
 ]
