@@ -436,5 +436,11 @@
     "slug": "metric-additive-semi-nonadditive",
     "title": "GMV 可以按天、按部门 SUM，转化率和库存为什么不行？可加、半可加、不可加指标怎么汇总？",
     "category": "指标体系"
+  },
+  {
+    "date": "2026-11-15",
+    "slug": "dq-quality-gate-circuit-breaker",
+    "title": "任务成功但数据是错的。质量门禁怎么做？规则失败时告警、隔离还是熔断下游？",
+    "category": "数据质量"
   }
 ]

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>任务成功但数据是错的。质量门禁怎么做？规则失败时告警、隔离还是熔断下游？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-11-15</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#74</span>
+                    <span class="problem-type tag-dq">数据质量</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">任务成功但数据是错的。质量门禁怎么做？规则失败时告警、隔离还是熔断下游？</h1>
+                <div class="topic-row"><span class="topic-chip">质量门禁</span><span class="topic-chip">熔断</span><span class="topic-chip">质量规则</span><span class="topic-chip">隔离分区</span><span class="topic-chip">SLA</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察候选人会不会把「作业 exit 0」和「数据可用」拆开。要能设计分层规则（阻断 / 告警 / 记录）、把门禁卡在产出对外可见之前，失败时熔断下游、隔离坏分区、可重跑补数。只会背完整性准确性及时性、说不清熔断和告警的差别、出事只发一条企微，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先拆两件事：调度成功 ≠ 数据正确；质量门禁是「对外可见」前的闸门，不是跑完后的巡检报表。</li><li>规则分层：阻断（空分区、主键爆炸、行数崩盘）、告警（波动超阈值）、记录（软规则/观察）。</li><li>失败处置：熔断下游、隔离坏分区或坏版本、告警到值班；禁止把错数写成 latest。</li><li>规则怎么配：表级 / 字段级 / 跨表对账，阈值跟基线和业务，要有豁免和冷却，避免天天误报。</li><li>收口：门禁可重跑、有 SLA、和数据契约/调度依赖绑在一起，而不是独立脚本。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：作业成功只说明 Spark/Hive 没挂，不说明今天的数能给业务用。质量门禁（DQ Gate）是产出对外可见之前的闸门：硬规则失败就熔断下游、隔离坏数据；软规则失败只告警。巡检报表是事后看，门禁是事前挡。</p>
+<p><strong>为什么必须有门禁。</strong> 典型事故不是任务红了，而是任务绿了：上游空跑、主键重复、枚举冒出未知码、金额全变成 0、分区写到了昨天。下游 ADS、看板、推送照常读「最新分区」，于是全公司看错数。面试先说这句：可用性看调度，正确性看门禁，两套信号不能合成一个成功状态。</p>
+<p><strong>门禁卡在哪。</strong> 卡在「对外可见」之前，不是跑完再扫一遍。常见落地：<br>1. 写入 staging / 影子分区（如 <code>dt=2026-11-15/_staging</code> 或 Iceberg 的 staging snapshot）。<br>2. 跑规则：通过才 commit / 改名成正式分区 / 发布 snapshot；失败不推进 <code>latest</code>。<br>3. 下游依赖正式分区或「质量通过」信号，而不是依赖上游任务绿。<br>湖表更好做：Hudi/Iceberg/Delta 先写新快照，校验失败不 commit，或 commit 后立刻 rollback；Hive 路径表至少用 staging + 成功后 <code>msck</code>/改名，禁止直接覆盖正式路径。</p>
+<p><strong>规则怎么分层，面试按三级说。</strong><br>- <strong>阻断（blocker）</strong>：空分区或行数为 0（且历史不是 0）；主键 / 业务键不唯一；必填字段空值率 100%；行数相对 7 日中位数暴跌或暴涨（如 &lt;10% 或 &gt;10 倍）；金额合计变 0 或出现大量负值（业务不允许时）。失败 = 数据不可用。<br>- <strong>告警（warning）</strong>：空值率、未知枚举占比、波动超过 3σ 或 WoW 阈值、跨表差异在灰区。失败 = 能用但要人看。<br>- <strong>记录（info）</strong>：新枚举值出现、分布漂移、长尾异常。只进质量看板，不叫人。<br>规则粒度：表级（行数、空分区、新鲜度）、字段级（null、范围、枚举、正则）、跨表（主键能对上、金额能对上、昨天分区能对上）。不要一上来上百条，先覆盖「错了会炸看板」的那几条。</p>
+<p><strong>失败了三种处置，不要只告警。</strong><br>1. <strong>熔断下游</strong>：调度上把质量任务做成硬依赖，或发一个 <code>dq_pass=false</code> 让下游 skip。看板继续展示上一个通过日，并打「数据未更新」而不是展示错数。<br>2. <strong>隔离</strong>：坏分区留在 staging / <code>quarantine</code>，不要删（要留证据和补数对照）；正式路径保持昨天。分区表只隔离当天 <code>dt</code>，别把整张表 drop。<br>3. <strong>告警 + 值班</strong>：阻断必须 Pager/电话，告警走群；内容带表、分区、规则、实际值 vs 阈值、影响下游清单（靠血缘）。<br>补数：修上游或补跑后<strong>重跑门禁</strong>，通过才放行。禁止「先把错数放出去再补」——除非有书面豁免。</p>
+<p>阈值怎么定，别拍脑袋。行数、金额用 7～14 日中位数 + 分位数，避开周一效应和活动日；活动日、大促要有日历豁免。主键唯一性是 0 容忍，不要做成「重复率 &lt;1% 就行」——那 1% 往往是钱。枚举用允许清单，未知码超万分之几就告警，超比例阻断。</p>
+<p>口述例子：交易 DWD 今天行数只有昨天的 3%，任务却成功了——上游 CDC 断流，作业读到空增量还照写。门禁 blocker「行数 &lt; 中位数 20%」拦住，staging 不发布，ADS 和 GMV 看板留昨日并标红，值班按血缘通知数仓和业务。补数后重跑门禁，通过才切 latest。如果只发企微、下游照跑，这就是一次数据事故而不是一次质量能力。</p>
+<p>收尾：面试官要听的是「成功 ≠ 可用 → 门禁在可见前 → 阻断熔断隔离、告警不挡、记录观察 → 补数必须再过门禁」。能主动说下游依赖质量信号而不是任务绿，这题就过了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">质量门禁</span><span class="keyword-chip">熔断</span><span class="keyword-chip">隔离分区</span><span class="keyword-chip">staging</span><span class="keyword-chip">阻断规则</span><span class="keyword-chip">成功≠可用</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：规则误报把全链路熔断了，业务骂看板停更。豁免和分级怎么做，才不会把门禁关掉？</h4>
+            <div class="followup-answer"><p>先分级：blocker 才能熔断，warning 只告警。误报多半是阈值没剔除活动日、或把「允许为 0」的表（如某类目当天无单）当成空分区。处理：① 表级日历豁免（大促、迁移日）写进规则配置，不是口头说一声；② 冷却：同一规则连续失败才升级，或人工 ack 后本分区豁免、下分区仍拦；③ 豁免必须留工单、过期时间和补检任务，禁止改代码 <code>if skip_dq</code>。门禁误报要调阈值和基线，不要删规则。对「宁可停更不可错数」的核心表保持阻断；对探索型 ADS 可以降级为告警。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：一张天分区表只坏了今天，怎么隔离？湖表快照和 Hive 路径表有什么差别？</h4>
+            <div class="followup-answer"><p>Hive 路径表：写 <code>dt=D/_staging</code>，通过后改名为正式 <code>dt=D</code>；失败则 staging 留着、正式分区不出现，下游 <code>WHERE dt=D</code> 读不到今天，应回退展示 D-1 并告警。千万别覆盖写正式路径后再查，失败了已经污染。湖表：写新 snapshot，规则挂在 commit 前；失败不 commit，或 commit 后 rollback 到上一 snapshot，<code>latest</code> 仍指向旧快照。隔离单位永远是「这一次产出 / 这一个分区」，不要 drop 整表、不要把历史分区改成失败状态。补数覆盖同一分区后必须重新 gate。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：实时链路也能做质量门禁吗？和离线 T+1 有什么不一样？</h4>
+            <div class="followup-answer"><p>能做，但闸门更短、更要分级。流式常用：① 入湖/入 Kafka 后的 schema 与契约校验，不合法进死信不进主话题；② 窗口级指标（1 分钟行数、空值率、延迟）超阈值先告警，连续 N 个窗口再熔断下游消费或切只读缓存；③ 对账用准实时累加 vs 离线分区，T+1 门禁仍是真值。实时几乎不能「整批不发布」，所以熔断常表现为停止更新、回放上一个好窗口、或降级用离线数。SLA 要写清楚：实时允许短暂缺口，离线核心表不允许错数出门。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>把任务绿当成数据可用，下游依赖调度成功而不是质量通过信号</li><li>规则全是告警没有阻断，错数照样写成 latest</li><li>直接覆盖正式分区再校验，失败时已经污染下游</li><li>空分区、主键重复做成软阈值，或活动日没有豁免导致全链路误熔断</li><li>失败就删分区、不留 staging/quarantine，事后无法对账和补数</li><li>门禁脚本独立于调度，补数重跑不经过门禁，或豁免写死在代码里不过期</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">作业成功不是数据可用：门禁卡在对外可见前，硬规则熔断并隔离坏分区，软规则告警，补数必须再过门禁。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
