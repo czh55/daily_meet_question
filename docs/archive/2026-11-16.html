@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spark 开了 AQE 为什么还 Shuffle 爆炸？自适应执行到底改分区、改 Join 还是改倾斜？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-11-16</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#75</span>
+                    <span class="problem-type tag-bigdata">大数据计算</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">Spark 开了 AQE 为什么还 Shuffle 爆炸？自适应执行到底改分区、改 Join 还是改倾斜？</h1>
+                <div class="topic-row"><span class="topic-chip">Spark</span><span class="topic-chip">AQE</span><span class="topic-chip">自适应执行</span><span class="topic-chip">动态分区合并</span><span class="topic-chip">倾斜 Join</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察候选人会不会把 AQE 当成「打开就变快」的开关。要能拆成运行时三件事：合并过细 Shuffle 分区、按真实大小改 Join 策略、把倾斜分区拆开。只会背 spark.sql.adaptive.enabled、说不清和 CBO / hint / 手工加盐的边界、不会用 Spark UI 验证计划变没变，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先定义：AQE 是 Stage 跑完拿到真实 Shuffle 统计后再改后续计划，不是编译期 CBO 的替代。</li><li>三件套：动态合并分区、动态切换 Join（SMJ→广播）、倾斜 Join 拆分。</li><li>开关与阈值：总开关 + 三个子开关，advisory partition size、广播阈值、倾斜倍数要对着数据量调。</li><li>边界：治不了 UDF 黑盒、源头热点、小文件生产和固定分区契约；流式短作业收益常为负。</li><li>验证：看 SQL 页的 AQE 前后计划、Join 策略、分区数，不要只看作业绿了。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：AQE（Adaptive Query Execution）是 Spark 在 Shuffle 写完之后，拿真实分区大小再改后面的计划。它减的是「编译期猜错」的税：分区开太多、该广播却走了 Sort-Merge、倾斜分区没拆。它不是新引擎，也替代不了建模、过滤和源头打散。</p>
+<p><strong>先把 AQE 和 CBO 拆开。</strong> 编译期优化器（CBO / 规则优化）看的是表统计、过滤条件和 hint，计划在作业提交时就定了。AQE 插在 Stage 之间：上游 ShuffleMapStage 落盘后，Driver 看到每个 map 输出多大，再决定下游怎么跑。统计过期、动态分区裁剪后表变小、倾斜事先看不见——这些才是 AQE 的主场。面试别说成「开了 AQE 就不用收集统计」。</p>
+<p><strong>三件套，按「它改了计划的哪一块」说。</strong></p>
+<ul><li><strong>动态合并 Shuffle 分区（Coalesce Shuffle Partitions）。</strong> 默认 <code>spark.sql.shuffle.partitions=200</code>，小表 join 也会拆 200 个 task，调度和小文件一起炸。AQE 按 <code>spark.sql.adaptive.advisoryPartitionSizeInBytes</code>（常见 64MB）把过细的 shuffle 分区合并。口述例子：维表过滤后只剩 800MB，200 个分区每个 4MB，合并成十几个，Stage 时间从「全是调度」变成「真正算」。注意：它合并的是<strong>这次 Shuffle 的读端分区</strong>，不是帮你把已经写成的 200 个小文件 compact 掉；下游如果 <code>INSERT</code> 按 shuffle 分区落盘，合并后文件数会变少，这是收益也是契约变化。</li></ul>
+<ul><li><strong>动态切换 Join 策略。</strong> 编译期看统计觉得两边都大，走 Sort-Merge Join，两边 Shuffle。跑完一边发现其实只有 8MB，AQE 可以把后续改成 Broadcast Hash Join，大表不再搬家。这和「小表用 broadcast」是同一件事，只是大小运行时才知道。<code>spark.sql.autoBroadcastJoinThreshold</code> 仍然约束能广播多大；AQE 不会把 2GB 维表塞进 Driver。维表确定很小、SLA 紧，还是写 <code>/*+ BROADCAST(d) */</code>，别赌 AQE。</li></ul>
+<ul><li><strong>倾斜 Join（Optimize Skewed Join）。</strong> Shuffle 后看到某个分区比中位数大很多（由 <code>spark.sql.adaptive.skewJoin.skewedPartitionFactor</code> 和 <code>skewedPartitionThresholdInBytes</code> 判定），AQE 把这个大分区拆成多份，去跟对侧复制后的分区分别 join，再拼回来。它治的是「某一个 shuffle 分区过大」，不是「某一个业务 key 在 UDF 里炸了」——UDF / 黑盒聚合 AQE 看不见。空字符串、<code>unknown</code> 这种超热 key，源头过滤或加盐仍要做。</li></ul>
+<p><strong>开关怎么开，别只背一个 true。</strong></p>
+<pre><code>spark.sql.adaptive.enabled                      true   -- 总闸
+spark.sql.adaptive.coalescePartitions.enabled   true
+spark.sql.adaptive.advisoryPartitionSizeInBytes 64MB   -- 按 executor 核数和目标文件大小调
+spark.sql.adaptive.localShuffleReader.enabled   true   -- 同 executor 的 shuffle 尽量不走网络
+spark.sql.adaptive.skewJoin.enabled             true
+spark.sql.adaptive.skewJoin.skewedPartitionFactor 5
+spark.sql.autoBroadcastJoinThreshold            10MB~64MB  -- 和 Driver / executor 内存一起看</code></pre>
+<p>Spark 3.x 默认常已打开 AQE；面试要能说出<strong>你改过哪个阈值、为什么</strong>，而不是「我们开了 AQE」。分区目标太大，合并后单 task 又 OOM；太小，又回到小文件。倾斜因子太灵敏会把正常大分区拆碎，Stage 数变多。</p>
+<p><strong>什么时候不要指望 AQE。</strong><br>- 流式 / 秒级小作业：多一次 Stage 边界决策，收益盖不住调度。<br>- 下游有「必须 200 个文件、按分区号对齐」的契约：合并会改文件数，用显式 <code>repartition(n)</code> 写死，或写完再 compact。<br>- 计算在 UDF、<code>mapPartitions</code>、爆炸性 <code>explode</code> 里：优化器没有统计，AQE 帮不上。<br>- 倾斜在读扫描端（单个输入文件极大、未切分）：那是输入分片问题，不是 shuffle 倾斜。<br>- 把 AQE 和动态资源分配（Dynamic Allocation）混为一谈：一个改计划，一个改 executor 个数。</p>
+<p>口述例子：交易事实 join 城市维表。统计过期，编译期走 SMJ，200 分区 Shuffle 爆炸。打开 AQE 后：维表真实 12MB，第二阶段改 BHJ；事实表 shuffle 后 40 个过细分区被合成 8 个；<code>city_id is null</code> 那个分区是中位数的 20 倍，被拆成 4 个 task。Spark UI SQL 页能看到「AdaptiveSparkPlan」和 isFinalPlan。如果 UI 上仍是 200 个 2 秒 task，说明 coalesce 没生效，去查是不是关了子开关、或数据其实均匀且已经够大。</p>
+<p>收尾：面试官要听的是「AQE = Shuffle 之后用真实大小改计划 → 合并分区、改广播、拆倾斜分区 → 阈值对着内存和文件数调 → 用 UI 验证，而不是相信开关」。能主动说它减税不替代源头治理，这题就过了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">AQE</span><span class="keyword-chip">自适应执行</span><span class="keyword-chip">coalescePartitions</span><span class="keyword-chip">动态 Join</span><span class="keyword-chip">skewJoin</span><span class="keyword-chip">AdaptiveSparkPlan</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：AQE 动态合并分区，和 repartition / coalesce 怎么选？会不会把下游小文件变成超大文件？</h4>
+            <div class="followup-answer"><p>repartition(n) 是你指定一次 Shuffle，次数确定、文件数确定，适合「写出恰好 n 个文件」的契约。coalesce(n) 只能减分区、尽量不 Shuffle，适合末尾减少 task，但可能不均。AQE 合并发生在<strong>已有 Shuffle 的读端</strong>，n 是运行时算出来的，适合中间 Stage 别被 200 绑死。写出如果在意文件大小：让 AQE 把中间 shuffle 合并到 64～128MB，最后用 <code>repartition(目标文件数)</code> 或表格式的 compact 管落盘子。advisory 调到 512MB、executor 内存 4g，单 task 很容易 OOM——合并是为了去掉过细，不是为了凑超大分区。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：倾斜 Join 被 AQE 拆开，和手工加盐、两阶段聚合有什么差别？AQE 治不了哪类倾斜？</h4>
+            <div class="followup-answer"><p>AQE skew join 拆的是已经形成的过大 shuffle 分区，对侧对应分区会复制多份再分别 join，对 SQL 等值 Join 最有效，你不用改业务 SQL。手工加盐是在计划前打散热点 key，适合你已经知道 key 分布、或倾斜发生在聚合而不是 join。两阶段聚合治的是 <code>groupBy</code> 先局部再全局。AQE 治不了：① UDF / 窗口里按热 key 爆炸；② 输入文件本身是一个未切分的超大 partition；③ 广播 join 里大表本地热 key（没有 shuffle 分区可拆）；④ 倾斜在业务上必须保留的超热实体（要过滤或单独链路）。定位仍看 Stage 的 task 耗时分布，不要假设开了 skewJoin 就没有长尾。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：怎么证明 AQE 真的改了计划？和统计信息、hint 冲突时听谁的？</h4>
+            <div class="followup-answer"><p>看 Spark UI 的 SQL / DAG：有 AdaptiveSparkPlan，且 Final Plan 的 Join 类型、分区数和 Initial Plan 不同，才叫生效。对比 <code>explain(mode='formatted')</code> 的 isFinalPlan。作业日志里会有 coalesce / skewed partition 的 info。冲突时：强制 hint（BROADCAST / SHUFFLE_MERGE）优先，AQE 尊重 hint；表统计影响的是初始计划，AQE 用运行时大小覆盖「猜错的那一段」。SLA 紧的维表关联写 hint，让 AQE 去管中间 shuffle 分区数和偶然倾斜。验证要带一次「关掉 AQE 的对照」，否则说不清变快是 AQE 还是刚好数据变了。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>只开 adaptive.enabled，却关了 coalesce / skewJoin 子开关，或 Spark 2.x 根本没有 AQE</li><li>把 AQE 和动态资源分配当成一回事，改计划 vs 改 executor 数</li><li>advisoryPartitionSize 调太大，合并后单 task OOM；或下游依赖固定 200 个文件却被动态合并打乱</li><li>以为 AQE 能看见 UDF / 热 key 业务倾斜，开了 skewJoin 就不再过滤空 key、不再加盐</li><li>不看 Spark UI 的 AdaptiveSparkPlan，作业变绿就当 AQE 生效</li><li>短作业、流式微批也强开，多一轮 Stage 决策把延迟打高</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">AQE 是 Shuffle 之后拿真实大小再改计划：过细分区合并、小表改广播、倾斜分区拆开；它减税，不替代源头打散和 hint。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

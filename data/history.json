@@ -442,5 +442,11 @@
     "slug": "dq-quality-gate-circuit-breaker",
     "title": "任务成功但数据是错的。质量门禁怎么做？规则失败时告警、隔离还是熔断下游？",
     "category": "数据质量"
+  },
+  {
+    "date": "2026-11-16",
+    "slug": "spark-aqe-adaptive-query-execution",
+    "title": "Spark 开了 AQE 为什么还 Shuffle 爆炸？自适应执行到底改分区、改 Join 还是改倾斜？",
+    "category": "大数据计算"
   }
 ]
