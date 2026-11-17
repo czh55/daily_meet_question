@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>上线实验前为什么要做 AA 检验？AA 显著了说明什么、你怎么处理？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-11-17</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#76</span>
+                    <span class="problem-type tag-ab">A/B实验</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">上线实验前为什么要做 AA 检验？AA 显著了说明什么、你怎么处理？</h1>
+                <div class="topic-row"><span class="topic-chip">AA检验</span><span class="topic-chip">随机化体检</span><span class="topic-chip">假阳性</span><span class="topic-chip">分流哈希</span><span class="topic-chip">指标口径</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察候选人会不会把 AA 当成「两组必须完全一样」的验收开关。要讲清 AA 验的是随机化和指标管道、α 水平下本就有假阳性、显著后先拆分流/口径/噪声而不是立刻作废平台。只会说「AA 不显著才能开 AB」、说不清和 SRM 的差别、或拿二十个指标里两个显著就判系统有偏，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先定义：AA 是两组同一体验（或都无处理），检验指标差是否只剩噪声。</li><li>验三件事：分流哈希与进组、埋点/口径管道、第一类错误是否校准。</li><li>显著不等于坏：α=0.05 时约 5% 的真零差会显著；先看效应量、SRM、时间趋势。</li><li>处理顺序：查样本比 → 查口径与过滤 → 查哈希/触发 → 多指标一起看 p 值分布。</li><li>收口：AA 是上线前体检，过了才信后续 AB；它替代不了样本量设计和 SRM 监控。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：AA 检验是把流量切成两组，但体验完全一样，看指标差是不是只剩抽样噪声。它验的是「随机化 + 指标管道」这两条腿还活着，不是证明产品没差异。AA 过了，后面 AB 显著你才敢说是处理带来的。</p>
+<p><strong>先把 AA 和 AB、SRM 拆开。</strong> AB 是一组有处理、一组没有，检验的是处理效应。AA 是两组都没有处理（或都上同一套旧版），原假设就是效应=0。SRM 看的是人数比是否等于设计分流比，比如 50:50 却来了 47:53。AA 看的是<strong>指标均值</strong>在零效应下是否像噪声；SRM 过了 AA 仍可能挂，因为口径、触发、过滤可以在人数对齐的同时把均值拧歪。面试别把「样本比正常」说成「AA 过了」。</p>
+<p><strong>AA 到底在验什么，按事故半径说。</strong><br>1. <strong>分流与进组。</strong> 哈希函数、盐、实验层正交、设备/账号/会话粒度是否一致。典型事故：按 uid 分流、按设备上报，同一人多设备进了不同组；或触发条件写在实验组页面上，对照永远触发不满。人数可以碰巧接近 50:50，但活跃用户、新客占比已经偏了，核心指标就会「AA 显著」。<br>2. <strong>埋点和口径管道。</strong> 同一事件两边过滤不一致（实验组多一层 <code>exp_hit=1</code>）、时区、去重键、新老口径混用。AA 是指标 SQL 的集成测试：两边 SQL 除了 group_id 不该有任何差别。<br>3. <strong>统计校准。</strong> 方差估计、聚类标准误（按用户而不是按天）、是否偷看。管道没偏，p 值在原假设下应近似均匀；你用错了方差，AA 会成批「显著」。</p>
+<p><strong>显著了先别判死刑。</strong> 单指标、双侧 α=0.05，真零差时大约 20 次里有 1 次会显著，这是假阳性，不是平台坏了。处理口令：<br>- 先看<strong>效应量</strong>：人均时长差 0.3 秒、相对 0.05%，即便 p=0.04 也更像噪声；GMV 相对差 8% 还伴随 SRM，才像事故。<br>- 再看 <strong>SRM 和协变量平衡</strong>：新老、城市、实验前指标（和 CUPED 那题的 X 一样）组间是否齐。不齐就去查哈希和触发，不要调 p 值阈值混过。<br>- 再看<strong>时间切片</strong>：是某一天埋点发布导致的，还是全程都偏。单日尖刺修管道；全程都偏，哈希或进组条件有系统性漏洞。<br>- 多指标：20 个指标里 1～2 个擦边显著，先看 p 值直方图像不像均匀；十几个同时显著、方向一致，才像管道或分流系统性偏差。</p>
+<p><strong>两种做法，别混。</strong><br>- <strong>历史回放 AA</strong>：用过去 7/14 天日志，按即将上线的哈希把用户切成两组，指标按正式口径算。便宜、快，能抓住哈希偏倚和口径 SQL 写错。抓不住「上线后才有的触发代码」「新埋点漏报」。<br>- <strong>线上空跑 AA</strong>：真分流、真走实验 SDK，但两组配置相同，跑满计划窗口。能抓到触发、曝光、客户端缓存。成本是占用流量和日历，正式 AB 前至少空跑到主指标方差稳定。<br>大改哈希、换实验层、换进组粒度，两种都要做：回放挡设计错误，空跑挡实现错误。</p>
+<p>口述例子：信息流改排序，先按 uid 哈希做两周历史回放，DAU、人均时长、点击率 p 值 0.3～0.8，SRM 通过。空跑三天发现实验组「曝光事件」多 6%，AA 的人均曝光显著——对照端少打了一次 <code>expose</code>。修埋点后再空跑，指标回到噪声带，这才开真 AB。若空跑时只有「收藏数」p=0.04、相对差 0.2%、其余指标安然，按预注册主指标继续，把收藏放进探索列表，不为此停平台。</p>
+<p>收尾：面试官要听的是「AA = 零处理下的指标体检 → 验分流和口径，不只验人数 → 显著先分假阳性/口径/哈希 → 回放加空跑」。能主动说多指标会制造假阳性、SRM 过了 AA 仍可能挂，这题就过了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">AA检验</span><span class="keyword-chip">随机化</span><span class="keyword-chip">假阳性</span><span class="keyword-chip">SRM</span><span class="keyword-chip">空跑</span><span class="keyword-chip">p值分布</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：α=0.05 时 AA 显著，一定要停平台吗？连续做很多次 AA，你怎么解释「偶尔显著」？</h4>
+            <div class="followup-answer"><p>不一定停。真零差、检验校准正确时，长期会有约 5% 的实验在 α=0.05 下显著，这是第一类错误的定义，不是 bug。决策看三件事：效应量是否大到像业务事故、是否伴随 SRM 或实验前指标不平衡、同一方向是否成批出现。连续 20 个独立 AA 里出现 1 个擦边显著，符合噪声；连续 3 个主指标都显著且相对差 &gt;2%，先当分流/口径事故。平台健康度用「AA 的 p 值是否像均匀、显著比例是否接近 α」来监控，不要用单次 p 值做死刑开关。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：历史数据回放 AA 和线上空跑各能抓什么、抓不住什么？只做一种行不行？</h4>
+            <div class="followup-answer"><p>回放能抓：哈希偏倚、层冲突、口径 SQL、过滤条件两边不一致、用错实验单元。抓不住：新埋点漏报、客户端缓存把旧版配置粘在一组、触发写在新页面上对照走不到、SDK 进组延迟。空跑能抓实现层，但窗口短时功效不够，小偏倚看不出来。只做回放就上 AB，等于相信「代码和埋点和历史一样」——大改触发链路时这假设不成立。最低配置：回放挡设计，空跑挡实现；哈希或粒度变更，两种都做。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：同时盯 20 个指标做 AA，其中 2 个显著，算平台有偏吗？和多重检验、预注册怎么配合？</h4>
+            <div class="followup-answer"><p>先当噪声。20 个近似独立检验、α=0.05，期望就是 1 个显著；2 个擦边很常见。看 p 值分布：均匀散开是校准正常，全挤在 0 附近才像系统性偏差。主指标、护栏、探索指标要预注册：AA 的放行看主指标和护栏，探索指标显著只记一笔，不拿来停平台。若要对多指标做硬门禁，用 Bonferroni / FDR 控制假发现，或看「显著个数是否远超 α×k」。不要事后挑两个显著的讲故事，那和 AB 偷看是同一类错误。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>把 AA 理解成两组数字必须字节级相等，或把 SRM 通过说成 AA 通过</li><li>α=0.05 下一次擦边显著就停平台，忽略假阳性和效应量</li><li>20 个指标里挑显著的讲「系统有偏」，不看 p 值分布、不做预注册</li><li>只做历史回放就上 AB，抓不住新埋点和触发代码；或空跑窗口太短当放行</li><li>AA 用的人群、粒度、口径和正式 AB 不一致，体检通过了实战管道却是另一套</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">AA 是零处理下的指标体检：验分流和口径，不只验人数；显著先分假阳性、口径和哈希，不要一显著就判平台死刑。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

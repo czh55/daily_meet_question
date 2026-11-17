@@ -15,7 +15,7 @@
             <a href="index.html" class="logo">
                 <span class="logo-icon">&#x25C7;</span>
             </a>
-            <span class="header-date">2026-11-16</span>
+            <span class="header-date">2026-11-17</span>
         </div>
     </header>
 
@@ -27,14 +27,14 @@
 
         <div class="today-problem">
             <div class="today-label">&#x1F4C5; 今日推荐</div>
-            <h2><a href="archive/2026-11-16.html">#75 Spark 开了 AQE 为什么还 Shuffle 爆炸？自适应执行到底改分区、改 Join 还是改倾斜？</a></h2>
+            <h2><a href="archive/2026-11-17.html">#76 上线实验前为什么要做 AA 检验？AA 显著了说明什么、你怎么处理？</a></h2>
             <div class="today-meta">
-                <span class="problem-type tag-bigdata">大数据计算</span>
+                <span class="problem-type tag-ab">A/B实验</span>
                 <span class="problem-difficulty difficulty-medium">中等</span>
             </div>
             <p style="margin-top:12px; color:var(--text-secondary); font-size:0.9rem;">
-                考察候选人会不会把 AQE 当成「打开就变快」的开关。要能拆成运行时三件事：合并过细 Shuffle 分区、按真实大小改 Join 策略、把倾斜分区拆开。只会背 spark.sql.adaptive.enabled、说不清和 CBO / hint / 手工加盐的边界、不会用 Spark UI 验证计划变没变，这题就浅了...
-                <a href="archive/2026-11-16.html">[查看完整讲解]</a>
+                考察候选人会不会把 AA 当成「两组必须完全一样」的验收开关。要讲清 AA 验的是随机化和指标管道、α 水平下本就有假阳性、显著后先拆分流/口径/噪声而不是立刻作废平台。只会说「AA 不显著才能开 AB」、说不清和 SRM 的差别、或拿二十个指标里两个显著就判系统有偏，这题就浅了。...
+                <a href="archive/2026-11-17.html">[查看完整讲解]</a>
             </p>
         </div>
 
@@ -42,6 +42,12 @@
             <h2>&#x1F4DA; 往期归档</h2>
             <div class="archive-grid">
                 <div class="archive-item">
+            <a href="archive/2026-11-16.html">
+                <div class="archive-date">2026-11-16</div>
+                <div class="archive-title">Spark 开了 AQE 为什么还 Shuffle 爆炸？自适应执行到底改分区、改 Join 还是改倾斜？</div>
+                <span class="archive-type problem-type tag-bigdata">大数据计算</span>
+            </a>
+        </div><div class="archive-item">
             <a href="archive/2026-11-15.html">
                 <div class="archive-date">2026-11-15</div>
                 <div class="archive-title">任务成功但数据是错的。质量门禁怎么做？规则失败时告警、隔离还是熔断下游？</div>
@@ -534,6 +540,14 @@
             </ul>
         </div><div class="type-card">
             <div class="type-card-header">
+                <span class="problem-type tag-ab">A/B实验</span>
+                <span class="type-count">6 题</span>
+            </div>
+            <ul class="type-problem-list">
+                <li><a href="archive/2026-11-17.html">上线实验前为什么要做 AA 检验？AA 显著了说明什么、你怎么处理？</a><span class="type-item-date">2026-11-17</span></li><li><a href="archive/2026-11-10.html">实验指标很噪、样本量不够，你会怎么做方差缩减？CUPED 原理和适用条件是什么？</a><span class="type-item-date">2026-11-10</span></li><li><a href="archive/2026-10-27.html">A/B 实验为什么不能天天偷看显著性？新奇效应和残留效应怎么处理？</a><span class="type-item-date">2026-10-27</span></li><li><a href="archive/2026-10-13.html">A/B 实验里什么是 SRM？发现分流比例和设计不一致，你会怎么排查？</a><span class="type-item-date">2026-10-13</span></li><li><a href="archive/2026-09-27.html">A/B 实验样本量怎么估算？</a><span class="type-item-date">2026-09-27</span></li><li><a href="archive/2026-09-09.html">A/B 实验的基本原理是什么？如何判断实验是否显著？</a><span class="type-item-date">2026-09-09</span></li>
+            </ul>
+        </div><div class="type-card">
+            <div class="type-card-header">
                 <span class="problem-type tag-metric">指标体系</span>
                 <span class="type-count">6 题</span>
             </div>
@@ -547,14 +561,6 @@
             </div>
             <ul class="type-problem-list">
                 <li><a href="archive/2026-11-15.html">任务成功但数据是错的。质量门禁怎么做？规则失败时告警、隔离还是熔断下游？</a><span class="type-item-date">2026-11-15</span></li><li><a href="archive/2026-11-09.html">上游加了字段、改了类型，下游作业挂了。数据契约和 Schema 演进你会怎么做？</a><span class="type-item-date">2026-11-09</span></li><li><a href="archive/2026-10-22.html">数仓任务延迟了，你怎么排查？数据新鲜度 SLA 怎么定？</a><span class="type-item-date">2026-10-22</span></li><li><a href="archive/2026-10-15.html">数据血缘是什么？出数据事故时你怎么用它定影响面？</a><span class="type-item-date">2026-10-15</span></li><li><a href="archive/2026-10-09.html">业务库和数仓对不上，你怎么对账？发现差异怎么排查？</a><span class="type-item-date">2026-10-09</span></li><li><a href="archive/2026-09-10.html">数据质量你怎么保障？出过数据事故的话怎么定位？</a><span class="type-item-date">2026-09-10</span></li>
-            </ul>
-        </div><div class="type-card">
-            <div class="type-card-header">
-                <span class="problem-type tag-ab">A/B实验</span>
-                <span class="type-count">5 题</span>
-            </div>
-            <ul class="type-problem-list">
-                <li><a href="archive/2026-11-10.html">实验指标很噪、样本量不够，你会怎么做方差缩减？CUPED 原理和适用条件是什么？</a><span class="type-item-date">2026-11-10</span></li><li><a href="archive/2026-10-27.html">A/B 实验为什么不能天天偷看显著性？新奇效应和残留效应怎么处理？</a><span class="type-item-date">2026-10-27</span></li><li><a href="archive/2026-10-13.html">A/B 实验里什么是 SRM？发现分流比例和设计不一致，你会怎么排查？</a><span class="type-item-date">2026-10-13</span></li><li><a href="archive/2026-09-27.html">A/B 实验样本量怎么估算？</a><span class="type-item-date">2026-09-27</span></li><li><a href="archive/2026-09-09.html">A/B 实验的基本原理是什么？如何判断实验是否显著？</a><span class="type-item-date">2026-09-09</span></li>
             </ul>
         </div><div class="type-card">
             <div class="type-card-header">

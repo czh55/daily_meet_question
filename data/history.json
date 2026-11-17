@@ -448,5 +448,11 @@
     "slug": "spark-aqe-adaptive-query-execution",
     "title": "Spark 开了 AQE 为什么还 Shuffle 爆炸？自适应执行到底改分区、改 Join 还是改倾斜？",
     "category": "大数据计算"
+  },
+  {
+    "date": "2026-11-17",
+    "slug": "ab-aa-test",
+    "title": "上线实验前为什么要做 AA 检验？AA 显著了说明什么、你怎么处理？",
+    "category": "A/B实验"
   }
 ]
