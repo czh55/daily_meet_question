@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>切片结论和整体相反是怎么回事？辛普森悖论和混杂你怎么处理？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-11-18</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#77</span>
+                    <span class="problem-type tag-biz">业务分析</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">切片结论和整体相反是怎么回事？辛普森悖论和混杂你怎么处理？</h1>
+                <div class="topic-row"><span class="topic-chip">辛普森悖论</span><span class="topic-chip">混杂</span><span class="topic-chip">加权平均</span><span class="topic-chip">标准化</span><span class="topic-chip">选择偏差</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察候选人会不会把「再切一刀」当成万能。要讲清整体率是各层的加权平均、方向相反来自混杂与分母结构不可比，以及下一步是标准化/分层报告/做实验，而不是继续下钻。只会说「分层看看」、把悖论当成 SQL 算错、或拿事后切片当因果，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先定义：整体指标是各层按人数/流量加权的平均，不是层内率的简单平均。</li><li>辛普森：各层方向一致（或都优于对照），整体却反向，因为两组的层结构不同。</li><li>混杂：那个分层变量同时影响「进哪一组/走哪条路径」和结果。</li><li>处理顺序：先验真 → 找混杂变量看分母结构 → 标准化或分层报告 → 能实验就实验。</li><li>收口：先问两组分母结构是否一样，再谈率的高低；和贡献拆解那题的结构效应是同一类权重问题。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：整体转化率是各层的加权平均，权是人数占比。切片里 B 层内都比 A 好、整体却 A 更高，通常不是算错，是两组人的层结构不一样——这就是辛普森悖论，根子是混杂。</p>
+<p><strong>先把「加权」说清楚。</strong> 总体转化 = Σ（该层人数占比 × 该层转化）。不是把新客转化和老客转化加起来除以 2。哪一层人多，哪一层就拽着整体走。面试时先写出式子，比先讲故事有用：</p>
+<pre><code>rate = Σ (n_k / N) × rate_k</code></pre>
+<p>对照组和处理组各自有一套 <code>(n_k / N)</code>。层内 <code>rate_k</code> 处理组全赢，但处理组如果堆在低转化层，整体仍可能输。</p>
+<p><strong>经典口述例子（渠道转化）。</strong> 新客层（低转化）：渠道 A 8%（100 人）、渠道 B 10%（1000 人）。老客层（高转化）：A 25%（1000 人）、B 30%（100 人）。每一层都是 B 更高。但整体：A = (8+250)/1100 ≈ 23.5%，B = (100+30)/1100 ≈ 11.8%，A 反而更高。不是 B 的投放更差，是 B 的流量几乎全堆在新客，A 几乎全是老客。层内比的是「同类人的转化」，整体比的是「一篮子人的结构」。面试不必背数字，要能当场说：B 层内全赢，整体仍可能输，因为分母结构不同。</p>
+<p><strong>混杂是什么。</strong> 「新老」同时决定了你更可能走哪条渠道（投放策略、准入），也决定了转化水平。渠道标签和转化之间夹着一个共同原因，这个共同原因就是混杂变量。不控制它，渠道对比不可比。同类场景：城市等级 vs 配送时长、机型档次 vs 崩溃率、医生年资 vs 手术成功率、内容池新旧 vs 点击率。</p>
+<p><strong>处理口令，按顺序。</strong><br>1. <strong>验真。</strong> 先排除口径、去重、窗口、空跑——和波动归因那题第一步一样。SQL join 膨胀、NULL 进分母，也会「整体和切片对不上」，但那是事故，不是辛普森。<br>2. <strong>摊开分母结构。</strong> 一张表：层 × 组，同时给人数占比和层内率。先看占比差了多少，再看层内率差了多少。占比差很大，就不要汇报粗率。<br>3. <strong>标准化或分层报告。</strong> 用同一套标准权重（例如全体用户的新老占比，或对照组占比）去加权两组的层内率，得到可比较的标准化率。业务会上两行都报：粗率（发生了什么）+ 标准化率（结构对齐后还剩什么）。不要只报其中一个。<br>4. <strong>能做实验就做实验。</strong> 随机化是为了让混杂的期望在两组对齐。不能随机时：分层抽样、匹配、回归控制，都要声明「只控制了已观测的层」，未观测混杂仍在。事后用转化结果再切片，会引入选择偏差，不是因果。</p>
+<p><strong>和贡献拆解怎么分工。</strong> 贡献拆解回答「这期相对基期，结构和水平各贡献多少」；辛普森回答「两组同时点对比，为什么层内和整体方向反了」。都是权重，问题不同：一个是时间对比的结构效应，一个是组间对比的混杂。别用十维透视代替标准化。</p>
+<p>收尾：面试官要听的是「整体率=加权平均 → 方向相反先查分母结构 → 标准化或实验对齐人群 → 粗率描述现状、标准化谈机制」。能主动说混杂是共同原因、事后切片有选择偏差，这题就过了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">辛普森悖论</span><span class="keyword-chip">混杂</span><span class="keyword-chip">加权平均</span><span class="keyword-chip">标准化</span><span class="keyword-chip">分母结构</span><span class="keyword-chip">选择偏差</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：直接标准化怎么算？和粗率分别什么时候用？权重用哪一组的？</h4>
+            <div class="followup-answer"><p>直接标准化：先算各组在每一层的率，再用同一套标准权重加权。标准权重常用全体样本的层占比，或对照组占比（「如果处理组长成对照那样」）。处理组标准化率 = Σ w_k × rate_处理,k，对照组同理，w 两边相同。粗率回答「实际发生了什么」（投放就堆在新客，整体就是低）；标准化回答「结构对齐后处理本身还剩多少」。汇报两行：粗率给运营看结果，标准化给策略看机制。权重不要用处理组自己的占比去套对照——那又把结构差加回去了。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：所有「切片和整体不一致」都是辛普森吗？和指标贡献里的结构效应、选择偏差怎么区分？</h4>
+            <div class="followup-answer"><p>不是。辛普森特指：分层后方向一致（或效应同号），加权后整体反向，且能指出混杂变量。结构效应是时间对比：本期流量挪到了更差的层，整体掉了，层内未必反向。选择偏差是进组/被观测的过程本身被结果影响，比如只用「已支付用户」比转化、只用「看完视频的人」比完播。三者可以叠在一起：先验真排除算错，再看是权重（辛普森/结构）还是进组过程（选择）。分不清时先把「谁进分母」写进指标说明书。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：不能做 A/B 时怎么降低混杂？匹配、分层回归要注意什么？</h4>
+            <div class="followup-answer"><p>先用业务知识列出混杂候选（新老、城市、实验前活跃），能分层就分层报告，层内样本够再谈层内差。匹配（含倾向分）是让两组在观测协变量上长得像，匹配后仍要检查平衡，并声明未观测混杂（动机、销售跟进）消不掉。回归控制同样只吃进模型的变量，还要小心把中介当控制（例如用「是否加购」解释「是否看到优惠券」对支付的影响，会把路径挡掉）。准实验（断点、DID）优于事后回归，但 ident 假设要讲出来。没有设计，就只报描述统计，不要说「所以该砍掉渠道 B」。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>把辛普森当成 SQL 算错或 join 膨胀，不先摊开各层人数占比</li><li>用各层转化率简单平均代替加权，或用处理组自己的结构去套对照</li><li>方向一反就再切十个维度，单元格过稀，故事越切越抖</li><li>拿粗率做策略决策、拿标准化率描述现状，两行指标混用</li><li>用事后切片（已转化、已完播）当因果，把选择偏差讲成渠道效果</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">整体率是加权平均不是层平均；方向相反先查分母结构（混杂），用标准化或实验对齐人群，不要再盲目下钻。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

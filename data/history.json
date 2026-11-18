@@ -454,5 +454,11 @@
     "slug": "ab-aa-test",
     "title": "上线实验前为什么要做 AA 检验？AA 显著了说明什么、你怎么处理？",
     "category": "A/B实验"
+  },
+  {
+    "date": "2026-11-18",
+    "slug": "biz-simpson-paradox-confounding",
+    "title": "切片结论和整体相反是怎么回事？辛普森悖论和混杂你怎么处理？",
+    "category": "业务分析"
   }
 ]
