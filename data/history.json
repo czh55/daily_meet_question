@@ -460,5 +460,11 @@
     "slug": "biz-simpson-paradox-confounding",
     "title": "切片结论和整体相反是怎么回事？辛普森悖论和混杂你怎么处理？",
     "category": "业务分析"
+  },
+  {
+    "date": "2026-11-19",
+    "slug": "sql-topn-per-group",
+    "title": "每个类目取销售额前 3 的商品，SQL 怎么写？并列、不足 3 条、QUALIFY 你会怎么处理？",
+    "category": "SQL"
   }
 ]

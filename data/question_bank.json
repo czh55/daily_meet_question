@@ -3615,5 +3615,59 @@
       "选择偏差"
     ],
     "anchor": "整体率是加权平均不是层平均；方向相反先查分母结构（混杂），用标准化或实验对齐人群，不要再盲目下钻。"
+  },
+  {
+    "id": 78,
+    "slug": "sql-topn-per-group",
+    "title": "每个类目取销售额前 3 的商品，SQL 怎么写？并列、不足 3 条、QUALIFY 你会怎么处理？",
+    "category": "SQL",
+    "difficulty": "中等",
+    "topics": [
+      "分组 TopN",
+      "ROW_NUMBER",
+      "RANK",
+      "QUALIFY",
+      "窗口函数"
+    ],
+    "ready": true,
+    "intent": "考察候选人会不会先钉「前 3」的契约：恰好三行、含并列、还是不足也照样出，再选对窗口函数。只背 ROW_NUMBER 却说不清和 RANK 的差、不会处理并列与「其他」汇总、把分组 TopN 写成全局 ORDER BY LIMIT，这题就浅了。",
+    "framework": [
+      "先钉契约：每个分组恰好 N 行，还是名次 ≤ N（并列都留）；不足 N 条是否原样输出；并列用什么稳定键拆开。",
+      "标准写法：窗口按分组 PARTITION、按指标 ORDER，外层滤名次；Hive/Spark 用 CTE，Snowflake/Databricks 可用 QUALIFY。",
+      "选型：恰好 N 行用 ROW_NUMBER；「并列都算进前 N」用 RANK 或 DENSE_RANK，并说清跳号差异。",
+      "对照错误写法：全局 LIMIT、GROUP BY 再 MAX 拼行、相关子查询逐组取，说明何时能用、何时会错或会慢。",
+      "收口：业务上常把第 N+1 名及以后收成「其他」；执行上 PARTITION 键基数和组内排序决定 Shuffle 成本。"
+    ],
+    "answer": "一句话：分组 TopN 是「每个 PARTITION 里按规则留前 N」，不是整表排序后 LIMIT。先问清「前 3」是恰好 3 行，还是名次 ≤ 3（并列全留）；不足 3 条默认照出，不要补假行。\n\n**标准口述 SQL（恰好 3 行）：**\n```sql\nWITH ranked AS (\n  SELECT\n    category_id, sku_id, gmv,\n    ROW_NUMBER() OVER (\n      PARTITION BY category_id\n      ORDER BY gmv DESC, sku_id  -- 并列用稳定键拆开，重跑不漂\n    ) AS rn\n  FROM sku_gmv_d\n  WHERE dt = DATE '2026-11-18'\n)\nSELECT category_id, sku_id, gmv\nFROM ranked\nWHERE rn <= 3;\n```\nSnowflake / Databricks 可以把滤名次写成 `QUALIFY ROW_NUMBER() OVER (...) <= 3`，少一层 CTE，语义一样。Hive、Spark SQL、MySQL 8 没有标准 QUALIFY，就用上面的 CTE。\n\n**ROW_NUMBER / RANK / DENSE_RANK 在这题里差在并列。** 两个 SKU 的 GMV 一样：\n- `ROW_NUMBER`：强制拆成 1、2，`rn<=3` 永远每组最多 3 行。报表格子固定、下游 JOIN 要唯一键，用它。\n- `RANK`：并列同名次并跳号（1,1,3）。`rank<=3` 可能 4 行，也可能因为跳号把第 3 名挤掉——「前三名」口语和 RANK 并不总对齐。\n- `DENSE_RANK`：并列同名次不跳号（1,1,2）。`dense_rank<=3` 是「前三个名次」，行数可以多于 3。\n\n面试时把这句话说完：看板要固定三张卡片，用 ROW_NUMBER；业务说「并列冠军都算进前三」，用 DENSE_RANK，并在指标说明书里写「按名次不是按行数」。\n\n**不要写成全局 TopN。** `ORDER BY gmv DESC LIMIT 3` 是全表前 3，大类目会把小类目吃光。相关子查询 `gmv >= (SELECT MIN(gmv) FROM ... WHERE category=外层.category ORDER BY gmv DESC LIMIT 3)` 能算，但相关执行、NULL、并列都难控，分组一多就慢。`GROUP BY category_id` 再 `MAX(gmv)` 只能拿一个数，拼不出「前 3 整行」。\n\n**不足 3 条和「其他」。** 某类目只有 2 个 SKU，`rn<=3` 就 2 行，不要用 0 行去补，除非产品明确要占位。运营报表常要「Top3 + 其他」：\n```sql\nSELECT\n  category_id,\n  CASE WHEN rn <= 3 THEN sku_id ELSE '其他' END AS sku_id,\n  SUM(gmv) AS gmv\nFROM ranked\nGROUP BY 1, 2;\n```\n这样既保留头部明细，又不丢长尾贡献——和指标贡献拆解里「头部 vs 结构」是同一类叙事。\n\n收尾：面试官要听的是「先定恰好 N 行还是名次 ≤ N → PARTITION + 窗口 → 并列用稳定键 → 不足照出、长尾收其他」。能主动说 QUALIFY 只是语法糖、全局 LIMIT 不是分组 TopN，这题就过了。",
+    "followups": [
+      {
+        "q": "同一类目两个 SKU 销售额并列第三，你留几个？报表和推荐场景有什么差别？",
+        "a": "先回契约。固定坑位（首页三张卡、邮件只展示 3 行）用 ROW_NUMBER，并列第三也只留一行，ORDER BY 再加 sku_id 或上架时间，保证每天同一套。运营排行榜「并列都上榜」用 DENSE_RANK，接受第 3 名次可能对应 4 行，并在注释写「按名次」。推荐/实验分配名额是稀缺资源，一般强制 ROW_NUMBER，避免一组吃掉超额曝光。不要面试现场才问「那并列怎么办」——要自己先把两种口径摆出来。"
+      },
+      {
+        "q": "QUALIFY、窗口后再 WHERE、子查询 IN TopN，执行上差在哪？大分区怎么优化？",
+        "a": "QUALIFY 是窗口算完再滤，语义等于 CTE + WHERE rn<=3，不是更早下推到扫描。相关子查询或 `sku_id IN (SELECT ... LIMIT 3)` 容易多次扫组内数据。组内行数极大时（头部类目几百万 SKU），窗口要在 PARTITION 内全排序；先按类目分区剪枝、只留需要的列，再窗口。有时先用近似或两阶段：各组先 HASH 聚合到 SKU 日 GMV，再对已经很小的结果做 TopN，避免在明细事件表上直接 ROW_NUMBER。Spark 里还能 salting 或按类目分拆作业，但口令仍是「先降粒度，再 TopN」。"
+      },
+      {
+        "q": "要「每组 Top3，同时输出该组总 GMV 和该 SKU 占比」，窗口怎么叠？和 GROUP BY 怎么分工？",
+        "a": "组总 GMV 是折叠，Top3 是保明细，两套粒度。可以同一层开两个窗口：`SUM(gmv) OVER (PARTITION BY category_id)` 给分母，`ROW_NUMBER() OVER (PARTITION BY category_id ORDER BY gmv DESC, sku_id)` 取行，外层 `WHERE rn<=3` 后算 `gmv / cat_gmv`。不要先 GROUP BY 类目再硬拼 SKU 字段。若只要组总、不要头部明细，直接 GROUP BY 即可，不必上 TopN。占比的分母用「全组 GMV」还是「Top3 合计」，是口径问题，写进说明书：前者看集中度，后者看头部内部结构。"
+      }
+    ],
+    "pitfalls": [
+      "写成 ORDER BY gmv DESC LIMIT 3，变成全局 TopN，小类目整组消失",
+      "用 RANK<=3 却按「恰好三行」验收，并列时多行或跳号少行，对不上报表格子",
+      "ORDER BY 只写 gmv，并列第三天留 A、明天留 B，对账和回归测试漂",
+      "GROUP BY 类目再 MAX(gmv) 拼 sku_id，字段来自不同行，Top1 都会拼脏，更别说 Top3",
+      "不足 3 条时用 0 或 NULL 假行去补，下游 SUM 把占位算进 GMV"
+    ],
+    "keywords": [
+      "分组 TopN",
+      "PARTITION BY",
+      "ROW_NUMBER",
+      "RANK/DENSE_RANK",
+      "QUALIFY",
+      "稳定排序键"
+    ],
+    "anchor": "分组 TopN 是 PARTITION 内取前 N，不是全局 LIMIT；恰好 N 行用 ROW_NUMBER，名次≤N 用 DENSE_RANK，并列要有稳定键。"
   }
 ]
