@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>一笔订单能绑多张优惠券、一个用户有多个标签，星型模型怎么处理多对多？桥接表怎么建？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-11-20</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#79</span>
+                    <span class="problem-type tag-dw">数仓建模</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">一笔订单能绑多张优惠券、一个用户有多个标签，星型模型怎么处理多对多？桥接表怎么建？</h1>
+                <div class="topic-row"><span class="topic-chip">桥接表</span><span class="topic-chip">多值维</span><span class="topic-chip">多对多</span><span class="topic-chip">权重分摊</span><span class="topic-chip">粒度</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察候选人会不会守住事实表粒度：一行仍是一笔订单，而不是券数或标签数。只会背星型「事实挂一圈维」却把多值属性直接炸进事实表、JOIN 后 SUM 翻倍还不声明，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先钉粒度：事实表一行代表什么；多值属性（多张券、多个标签、多个类目）不能改写这个粒度。</li><li>点破星型假设：经典星型是多对一，多对多要在事实和维之间加桥接表，而不是复制事实行。</li><li>讲清桥接表结构：组键或过程键 + 成员代理键 + 可选权重/角色/生效区间。</li><li>度量怎么汇总：按订单去重，或按权重分摊；禁止无声明地 JOIN 后 SUM。</li><li>收口对照：垃圾维、数组列、逗号拼接、账号-设备映射，各解决什么、不能互相替代。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：星型模型默认「多条事实对上一个维成员」；一笔订单多张券、一个用户多个标签是多对多，不要把事实表按成员数炸开。粒度仍是订单或用户日，多值关系放到桥接表，度量要么按主键去重，要么按权重分摊，必须写进说明书。</p>
+<p><strong>先把会炸的写法说死。</strong> 订单事实一行一个 <code>order_id</code>、一个 <code>gmv</code>。若直接 <code>JOIN</code> 订券关系、每张券复制一行，两张券就把 GMV 加两遍。这不是 SQL 写错，是粒度被改成「订单×券」却还在 SUM 订单金额。面试官要听的是：星型解决的是多对一；多值维要另建模，禁止偷改 grain。</p>
+<p><strong>桥接表（bridge table）干什么。</strong> 它夹在事实和多值维中间，记录「这个过程/这个组包含哪些成员」。常见两种形态：<br>1. <strong>过程键直连</strong>：粒度就是事实主键。<code>br_order_coupon(order_id, coupon_sk, allocation_pct, coupon_role)</code>，一笔订单 N 张券就 N 行，事实表仍一行。<br>2. <strong>组键（helper / group key）</strong>：事实表只挂 <code>coupon_group_sk</code>，桥接表是 <code>br_coupon_group(coupon_group_sk, coupon_sk, allocation_pct)</code>。同一券组合被很多订单复用时省行，ETL 要先给组合发组键。<br>标签、多类目、一单多品（若订单事实不是订单行而是订单头）都是同一套路。</p>
+<p>口述表结构：</p>
+<pre><code>-- 事实：一行仍是一笔订单，不按券复制
+-- fct_order(order_sk, order_id, user_sk, dt, gmv, coupon_group_sk)
+
+-- 桥接：组内多成员 + 权重，权重同组合计应为 1
+-- br_coupon_group(coupon_group_sk, coupon_sk, allocation_pct)
+
+-- 维：券本身的属性
+-- dim_coupon(coupon_sk, coupon_id, coupon_type, face_value)
+
+-- 口径 A：按订单看 GMV，桥接只用来切片「是否用过某类券」
+SELECT d.coupon_type, COUNT(DISTINCT f.order_id) AS order_cnt
+FROM fct_order f
+JOIN br_coupon_group b ON f.coupon_group_sk = b.coupon_group_sk
+JOIN dim_coupon d ON b.coupon_sk = d.coupon_sk
+WHERE f.dt = DATE '2026-11-19'
+GROUP BY 1;
+
+-- 口径 B：把 GMV 按权重分摊到券，SUM 才等于订单 GMV
+SELECT d.coupon_id, SUM(f.gmv * b.allocation_pct) AS allocated_gmv
+FROM fct_order f
+JOIN br_coupon_group b ON f.coupon_group_sk = b.coupon_group_sk
+JOIN dim_coupon d ON b.coupon_sk = d.coupon_sk
+WHERE f.dt = DATE '2026-11-19'
+GROUP BY 1;</code></pre>
+<p>没有 <code>COUNT(DISTINCT)</code> 也没有 <code>allocation_pct</code>，<code>SUM(gmv)</code> 默认翻倍——这是这题的高压线。</p>
+<p><strong>权重怎么定，必须先问业务。</strong> 均摊（1/N）、按面额占比、按核销金额、只把 100% 记在「主券」其余为 0，都合法，但同组必须加总为 1，否则全仓 GMV 对不齐。只要切片、不要分摊，用去重人数/订单数，不要发明一套假分摊。</p>
+<p><strong>和别的「看起来像多值」的东西分开。</strong><br>- <strong>垃圾维（junk dimension）</strong>：把一堆低基数标志（是否首单、是否包邮、支付方式）组合成一行，仍是多对一，不是桥接。<br>- <strong>退化维</strong>：订单号几乎没属性，直接放事实表，不必建空维，更不是多对多。<br>- <strong>数组列</strong>：现代仓可以 <code>coupon_ids ARRAY&lt;STRING&gt;</code> 做存在性过滤，分析友好度差，分摊、SCD、一致性维都难挂代理键；数组是加速，不是模型。<br>- <strong>账号-设备映射</strong>：也是桥接，但解决的是身份多对多，常带生效区间，不是把 GMV 分摊到设备。</p>
+<p>收尾：面试官要听的是「先守 grain → 多对多用桥接 → 度量去重或分摊必须声明 → 权重同组合计 1」。能主动说不要按券炸事实、垃圾维和数组不能替代桥接，这题就过了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">桥接表</span><span class="keyword-chip">多值维</span><span class="keyword-chip">多对多</span><span class="keyword-chip">权重分摊</span><span class="keyword-chip">粒度</span><span class="keyword-chip">COUNT DISTINCT</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：两张券均摊和「只记主券」差在哪？JOIN 之后 SUM(gmv) 为什么会错？</h4>
+            <div class="followup-answer"><p>均摊是把一笔 GMV 切成 N 份，切片到券后加总仍等于订单 GMV，适合看「券贡献结构」。只记主券是 100% 记在一张券上，其他券 allocation=0，适合运营认领，但其余券的存在性要用 COUNT DISTINCT 另做。错在：桥接一行对一张券，JOIN 后事实行被复制，SUM(gmv) 按复制次数放大。修复是 SUM(gmv * allocation_pct)，或先按 order_id 聚合再关联。看板标题必须写「分摊 GMV」还是「用券订单 GMV」，两个数都不能当另一个用。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：用户标签会变，桥接表要不要做成 SCD？和用户维 Type2 怎么配合？</h4>
+            <div class="followup-answer"><p>标签是多值且会变，桥接要带生效区间（start_dt, end_dt, is_current），按事件日命中「当时标签」，不要只留当前打标。用户维 Type2 解决的是单值属性历史（当时会员等级）；标签桥接解决的是多值成员历史。两套不要拧在一张宽维里把标签列拍平——列数爆炸、SCD 粒度和标签增减缠在一起。事实表仍挂 user_sk；需要当时标签时 join 桥接的有效行。分析「当前仍带某标签的用户历史 GMV」才用当前桥接行，并在说明书里写「重述口径」。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：Hive/Spark 里用 ARRAY 或逗号拼接 coupon_id，还要不要桥接表？一单多品怎么建模？</h4>
+            <div class="followup-answer"><p>ARRAY / explode 适合临时存在性过滤（用过满减券没有），做不成稳定分摊、代理键和一致性维。逗号拼接更糟：无法 JOIN 维表、无法保证权重。DWD 可以保留源系统的数组便于回放，DWS/星型消费层仍要桥接。一单多品：若问题是「一行代表一个订单」，SKU 是多值，用订单-SKU 桥接或直接把事实粒度改成订单行（order_item），度量用行金额而不是头表 GMV。改 grain 是合法选择，但改了就要全链路用行金额，禁止头表 GMV 再按行 SUM。选桥接还是改粒度，看主问题是「订单头指标 + 偶尔按券切」还是「行是一等公民」。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>把事实表按券/标签复制行，SUM(gmv) 按成员数翻倍还当对账通过</li><li>桥接表没有权重，JOIN 后直接 SUM，口径未声明</li><li>用逗号拼接或 ARRAY 当模型，无法挂代理键、无法分摊、无法 SCD</li><li>把低基数标志组合成的垃圾维当成桥接，或反过来把多值标签拍进垃圾维</li><li>标签桥接只留当前行，历史订单按今天的标签重述还不声明</li><li>把一单多品的头表 GMV 按明细行再 SUM，grain 和度量两套混用</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">多对多不要炸事实表：桥接表连成员，度量按主键去重或按权重分摊，权重同组合计为 1。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

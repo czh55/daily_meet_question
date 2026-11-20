@@ -466,5 +466,11 @@
     "slug": "sql-topn-per-group",
     "title": "每个类目取销售额前 3 的商品，SQL 怎么写？并列、不足 3 条、QUALIFY 你会怎么处理？",
     "category": "SQL"
+  },
+  {
+    "date": "2026-11-20",
+    "slug": "dw-bridge-table-multivalued",
+    "title": "一笔订单能绑多张优惠券、一个用户有多个标签，星型模型怎么处理多对多？桥接表怎么建？",
+    "category": "数仓建模"
   }
 ]
