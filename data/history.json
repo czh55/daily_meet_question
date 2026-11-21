@@ -472,5 +472,11 @@
     "slug": "dw-bridge-table-multivalued",
     "title": "一笔订单能绑多张优惠券、一个用户有多个标签，星型模型怎么处理多对多？桥接表怎么建？",
     "category": "数仓建模"
+  },
+  {
+    "date": "2026-11-21",
+    "slug": "metric-gmv-paid-refund-net",
+    "title": "GMV 按下单、支付还是成交算？退款怎么冲减，指标说明书怎么写？",
+    "category": "指标体系"
   }
 ]

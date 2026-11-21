@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GMV 按下单、支付还是成交算？退款怎么冲减，指标说明书怎么写？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-11-21</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#80</span>
+                    <span class="problem-type tag-metric">指标体系</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">GMV 按下单、支付还是成交算？退款怎么冲减，指标说明书怎么写？</h1>
+                <div class="topic-row"><span class="topic-chip">GMV口径</span><span class="topic-chip">成功态</span><span class="topic-chip">退款冲减</span><span class="topic-chip">指标说明书</span><span class="topic-chip">GTV/营收</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察候选人会不会把 GMV 当成必须先钉成功态的口径家族，而不是「成交金额」一个字段。说不清下单/支付/成交三套数、退款按哪一天冲、含不含税和运费，或把 GMV 和营收划等号，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先钉成功态：下单 GMV、支付 GMV、成交 GMV 是三套指标，看板标题必须写死哪一套。</li><li>再钉金额组成：含不含税、运费、优惠抵扣；未支付取消算不算；主体是订单金额还是买家。</li><li>退款三选一写进说明书：按原单日冲成净额、按退款发生日另记、或不冲 GMV 只报退款率。</li><li>对照 GTV / NMV / 平台营收 / take rate，自营和平台电商分母不同。</li><li>收口：权威表 + 时间字段（下单时/支付时/结算日）+ 口径变更双跑；GMV 可加，但净额依赖冲减规则。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：GMV 不是一个金额字段，是「哪一时刻算成功、金额含什么、退款怎么入账」三件事钉死之后的成交规模。面试先报成功态，再谈退款，最后才说和营收的差；不要一上来报「就是成交额」。</p>
+<p><strong>三套成功态，禁止混名。</strong><br>1. <strong>下单 GMV</strong>：用户提交订单那一刻的应付/商品额。含未支付、稍后取消。看需求意向和漏斗顶部，虚高，不能当经营结果。<br>2. <strong>支付 GMV</strong>：支付成功（资金授权或实收）的金额。经营日报、投放 ROI 最常用这一套。时间字段用 <code>pay_time</code> 落日，不是 <code>create_time</code>。<br>3. <strong>成交 / 确认收货 GMV</strong>：过了售后期或确认收货后的金额。更接近「货真的卖掉了」，滞后几天到十几天。</p>
+<p>同一天三套数可以对不上，这是口径不是事故。看板标题写成「支付成功 GMV」，不要只写 GMV。</p>
+<p><strong>金额组成也要进说明书。</strong> 常见分叉：含税还是未税、含不含运费、券前还是券后、是否含货到付款未回款。平台电商还要声明：是 GTV（成交总额，含商家实收）还是平台抽成后的营收。自营把进货成本扣掉才是毛利，不是 GMV。主体一般是订单行金额 SUM，不是买家数——人数另做去重买家。</p>
+<p>口述级口径（支付 GMV，券后、含税、不含运费）：</p>
+<pre><code>-- 日支付 GMV：成功态=支付成功，时间=支付日，未支付/取消不进
+SELECT
+  DATE(pay_time) AS dt,
+  SUM(pay_amt) AS paid_gmv,          -- 用户实付（券后）
+  COUNT(DISTINCT order_id) AS paid_orders,
+  COUNT(DISTINCT user_id) AS paid_buyers
+FROM dwd_order_pay
+WHERE pay_status = 'success'
+  AND is_test = 0
+  AND DATE(pay_time) = DATE '2026-11-20'
+GROUP BY 1;</code></pre>
+<p><strong>退款是这题的高压线。</strong> 三种合法，混用必对不齐：<br>1. <strong>按原单支付日冲减（重述净额 / NMV）</strong>：11-01 支付 100，11-05 退 30，则 11-01 的净 GMV 变成 70。历史看板会回刷。适合结算、对账、看「那天卖的货最后剩多少」。<br>2. <strong>按退款发生日另记</strong>：11-01 仍记 100，11-05 记退款 30（或净 GMV −30）。历史不回刷，适合看当天资金进出和客服压力。<br>3. <strong>GMV 不冲减，退款率当护栏</strong>：支付 GMV 保持发生制，另报 <code>refund_amt / paid_gmv</code>。适合增长看板，避免退款把趋势拧成「那天没卖好」。</p>
+<p>部分退款按行金额减，不要整单置零。取消未支付本来就不在支付 GMV 里，不要再冲一次。</p>
+<p>净额可以这样写（原单日重述）：</p>
+<pre><code>SELECT
+  DATE(p.pay_time) AS dt,
+  SUM(p.pay_amt) AS paid_gmv,
+  SUM(COALESCE(r.refund_amt, 0)) AS refund_amt,
+  SUM(p.pay_amt) - SUM(COALESCE(r.refund_amt, 0)) AS net_gmv
+FROM dwd_order_pay p
+LEFT JOIN (
+  SELECT order_id, SUM(refund_amt) AS refund_amt
+  FROM dwd_refund
+  WHERE refund_status = 'success'
+  GROUP BY 1
+) r ON p.order_id = r.order_id
+WHERE p.pay_status = 'success' AND p.is_test = 0
+GROUP BY 1;</code></pre>
+<p>JOIN 退款表后若一行变多行，SUM 会翻倍——和桥接表那题同一条高压线，退款要先按订单折好再关联。</p>
+<p><strong>和相邻指标划界。</strong><br>- <strong>GTV</strong>：平台成交总额，常含商家货款，不等于平台营收。<br>- <strong>NMV / 净 GMV</strong>：GMV 减退款（按你选的冲减规则）。<br>- <strong>营收 / take rate</strong>：自营是销售额，平台是佣金+广告+服务费；take rate = 平台营收 / GTV。用 GMV 当营收，财务会对死。<br>- <strong>可加性</strong>：支付 GMV 沿天、类目、渠道可 SUM（可加指标那题）；净额在「原单日重述」下也可加，但跨天退款会改历史，日报缓存要声明是否重刷。</p>
+<p>收尾：面试官要听的是「先成功态 → 再金额组成 → 退款三选一写死 → GMV ≠ 营收」。能主动说支付日和退款日不能 silently 混、JOIN 退款前要折订单，这题就过了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">GMV口径</span><span class="keyword-chip">成功态</span><span class="keyword-chip">支付GMV</span><span class="keyword-chip">退款冲减</span><span class="keyword-chip">NMV</span><span class="keyword-chip">指标说明书</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：11 月 1 日支付、5 日退款，净 GMV 记在哪一天？看板要不要回刷历史？</h4>
+            <div class="followup-answer"><p>先问这份看板的用途。结算/对账/看「那天订单的最终质量」：记在 11-01，净额从 100 改成 70，历史回刷，标题写「截至 as_of 的净支付 GMV」。投放日报/客服当日压力：11-01 仍 100，11-05 记退款 30，历史不回刷。两套可以并存，必须两个名字（paid_gmv vs net_gmv_as_of），禁止同一字段今天重述明天不重述。回刷要有 as_of 分区或每日全量覆盖支付日，不要在明细上原地 UPDATE 又不改 ADS 日期。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：平台电商的 GMV、GTV、营收、take rate 怎么分？自营和平台能用同一套说明书吗？</h4>
+            <div class="followup-answer"><p>平台 GTV/GMV 通常是成交商品额（商家+平台视角的规模），平台营收是佣金、广告、服务费，take rate = 营收/GTV。自营 GMV 接近销售额，营收还要减进货和履约，毛利率才是经营质量。两套不能共用一张说明书：主体（谁的钱）、成功态（支付 vs 结算分账）、是否含商家货款都不同。面试加分：广告收入不要加进 GMV；补贴是费用不是负 GMV，除非说明书明确「券后实付」。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：未支付取消、部分退款、运费和税、货到付款，说明书漏写哪一条最容易三个看板三个数？</h4>
+            <div class="followup-answer"><p>最常见是成功态+时间字段没写死：有的用下单日含未支付，有的用支付日，有的用结算日，三个数永远对不上——和语义层那题是同一类口径分叉。其次是部分退款：有的整单作废，有的按行减，有的只退货款不退运费。税和运费是第三名：财务含税、运营未税、物流把运费算进 GMV。货到付款要声明「签收/回款才算支付成功」，否则下单 GMV 会把未回款算进去。漏写时先补说明书再对账，不要先改 SQL。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>看板只写 GMV，不声明下单/支付/成交，三个数对不上还先怪数仓</li><li>用 create_time 聚合支付 GMV，或用 pay_time 聚合下单意向，日期错位</li><li>JOIN 退款明细后直接 SUM(pay_amt)，一行变多行把 GMV 放大</li><li>退款有的按原单日冲、有的按发生日冲，同一字段两套规则</li><li>把 GMV 当营收，或把补贴/券金额当成负 GMV 却不声明券前券后</li><li>取消未支付又按退款冲一次，金额被减两次</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">GMV 先钉成功态：下单、支付、成交是三套数；退款要么按原单日冲成净额，要么按发生日另记，禁止混用，也别把 GMV 当成营收。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
