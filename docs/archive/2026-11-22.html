@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>事实表关联维表对不上，你怎么处理？未知成员、孤儿事实、参照完整性怎么做？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-11-22</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#81</span>
+                    <span class="problem-type tag-dq">数据质量</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">事实表关联维表对不上，你怎么处理？未知成员、孤儿事实、参照完整性怎么做？</h1>
+                <div class="topic-row"><span class="topic-chip">参照完整性</span><span class="topic-chip">未知成员</span><span class="topic-chip">孤儿事实</span><span class="topic-chip">迟到维</span><span class="topic-chip">代理键</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察候选人会不会把「JOIN 不上」当成参照完整性事故，而不是一句 LEFT JOIN。说不清孤儿事实、未知成员、迟到维和代理键占位，或用 INNER JOIN 把对不上的订单从 GMV 里吞掉，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先定性丢键原因：源就缺维、抽取漏了、键对不齐（类型/空格/大小写）、还是维比事实晚到。</li><li>模型侧：事实只挂代理键；维表预置未知成员（如 sk=-1）；禁止用 INNER JOIN 把金额吞掉。</li><li>质量侧：参照完整性进门禁，输出孤儿样本键，而不是只报「有几行对不上」。</li><li>迟到维：先挂未知成员让事实落地，维到了再按业务键回刷代理键。</li><li>收口：根因修源系统或补维抽取，报表层 silently 过滤不算治理。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：事实对不上维，先当参照完整性事故，不要先改 SQL 把行滤掉。维表预置未知成员，事实先挂上让金额在；门禁把孤儿键打出来；维迟到了再回刷代理键。INNER JOIN 维表把 GMV 吞掉，是事故不是技巧。</p>
+<p><strong>先给现象命名。</strong> 事实表有 <code>order_id</code>、有金额，但 <code>sku_key</code> / <code>user_key</code> 在维表里找不到对应行——这叫孤儿事实（orphan fact）。不是「LEFT JOIN 就能交差」：LEFT JOIN 只是不丢行，不解释键为什么丢、钱算在哪个类目下。</p>
+<p>丢键常见四类，面试先分型再动手：<br>1. <strong>源就缺</strong>：下单时 SKU 已下架、用户未落会员表、测试单没维。要源系统补，不是数仓编一个真维。<br>2. <strong>抽取漏</strong>：维是全量漏增量、软删被滤、CDC 位点落后。维表比事实旧。<br>3. <strong>键对不齐</strong>：<code>sku_id</code> 一边是 <code>' 1001'</code>、一边是 <code>1001</code>；string vs bigint；大小写；末尾换行。对账看起来「有这个货」，JOIN 对不上。<br>4. <strong>迟到维（late-arriving dimension）</strong>：事实先到（订单已支付），维后到（商品主数据隔日同步）。合法，但不能让这笔 GMV 从日报消失。</p>
+<p><strong>模型怎么接。</strong> 星型里事实表只存代理键（surrogate key），不拿业务键满世界 JOIN 当前维。维表第一天就插入未知成员：</p>
+<pre><code>-- 维表预置，禁止业务用这个 id
+INSERT INTO dim_sku (sku_sk, sku_id, sku_name, cate_name, is_unknown)
+VALUES (-1, '_UNKNOWN', '未知商品', '未知类目', 1);</code></pre>
+<p>事实装载时 LOOKUP 维：命中用真 sk，未命中写 <code>-1</code>，<strong>事实行照样插入</strong>。看板用 LEFT JOIN 也能出数，未知类目单独一列，金额在，不在「少了 3% 还当对账过」。</p>
+<p>装载伪代码：</p>
+<pre><code>INSERT INTO fct_pay_d (dt, order_id, sku_sk, pay_amt)
+SELECT
+  o.dt,
+  o.order_id,
+  COALESCE(d.sku_sk, -1) AS sku_sk,  -- 对不上挂未知，不丢单
+  o.pay_amt
+FROM dwd_order_pay o
+LEFT JOIN dim_sku d
+  ON o.sku_id = d.sku_id
+ AND d.is_current = 1;   -- 当天装载用当前版本；历史重述另走 as-of</code></pre>
+<p>高压线：不要 <code>INNER JOIN dim_sku</code>。对不上的订单会从事实表蒸发，GMV、订单数、对账同时变少，还没有孤儿样本。</p>
+<p><strong>质量门禁查什么。</strong> 参照完整性是硬规则，不是「报表 JOIN 一下」。每天对正式分区：</p>
+<pre><code>-- 孤儿：事实代理键不在维表，或仍停在未知成员超出宽限
+SELECT f.order_id, f.sku_sk, f.pay_amt, f.dt
+FROM fct_pay_d f
+LEFT JOIN dim_sku d ON f.sku_sk = d.sku_sk
+WHERE f.dt = DATE '2026-11-21'
+  AND (d.sku_sk IS NULL OR d.is_unknown = 1);</code></pre>
+<p>规则分层可以和门禁那题对齐：未知成员占比超阈值（如金额 &gt;0.5%）→ 告警；完全找不到 sk（连 -1 都没有，说明 LOOKUP 写崩了）→ 阻断。输出必须带样本键，方便补维。只报「孤儿 1200 行」补不了数。</p>
+<p><strong>迟到维怎么收口。</strong> 当天维没到：事实挂 <code>-1</code>，日报 GMV 完整，类目切到「未知」。维到了（次日或小时级补抽）：<br>1. 用业务键再 LOOKUP，得到真 <code>sku_sk</code>；<br>2. 按 <code>order_id</code>（或事实主键）UPDATE / MERGE 回刷代理键，只改 sk，不改金额、不改 dt；<br>3. 重跑依赖类目的 DWS，<strong>重跑门禁</strong>。<br>不要等维到了再装事实——支付 GMV 的 SLA 通常比商品主数据紧。也不要在事实里长期留业务键当「反正能 JOIN」：SCD2 一开新链，业务键会挂到当前版本，把昨天订单改成今天的类目。</p>
+<p><strong>和相邻概念划界。</strong><br>- 未知成员 ≠ 垃圾维：垃圾维是把低基数标志（是否新客、是否券后）合成一维；未知成员是「这条事实暂时/永远对不上维」。<br>- 未知成员 ≠ 桥接表：多对多用桥接（优惠券那题）；一对多对不上用未知成员。<br>- 参照完整性 ≠ 源仓对账：对账比的是源和仓是不是同一批键；参照完整性比的是事实键在不在维里。两边都过，数才既全又挂得上属性。</p>
+<p>收尾：面试官要听的是「分型 → 未知成员占位 → 门禁打孤儿样本 → 迟到再回刷 sk」。能主动说禁止 INNER JOIN 吞 GMV、回刷只改代理键不改金额，这题就过了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">参照完整性</span><span class="keyword-chip">未知成员</span><span class="keyword-chip">孤儿事实</span><span class="keyword-chip">迟到维</span><span class="keyword-chip">代理键</span><span class="keyword-chip">LEFT JOIN</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：事实今天到、维明天才到，未知成员要挂多久？回刷代理键会不会把历史类目改掉？</h4>
+            <div class="followup-answer"><p>SLA 内（例如 T+1 主数据完成前）挂未知是预期，门禁用 warning 而不是 blocker。超过宽限仍是 -1，升级为阻断或事故：多半抽取漏或源就没有这条 SKU。回刷只改 <code>sku_sk</code>，金额、支付日、订单号不动；DWS 按事实 dt 重跑类目汇总，所以「昨天那笔订单的类目」会从未知变成真类目——这是补全，要声明看板 as_of。禁止顺手用今天的 SCD2 当前行去改更早的事实：历史订单应按下单/支付日 as-of 对应当时维版本，否则类目重述和迟到补键会混成一锅。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：未知成员要不要拆成「未匹配 / 已删除 / 测试」几个？和垃圾维怎么分工？</h4>
+            <div class="followup-answer"><p>核心金额表建议至少拆未匹配（迟到或键对不齐）和无效（测试、已删除、明确无维）。未匹配要回刷，无效不应回刷成真品类，否则测试单会进经营类目。代理键可以 -1/-2/-3，或一个未知行加 <code>unknown_reason</code>。不要把「是否未知」塞进垃圾维当普通标志——垃圾维是合法低基数属性的笛卡尔，未知是参照失败。报表要把未知类目单列，禁止把 -1 的金额摊进「其他」里藏掉。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：维表做了 SCD2，事实当时挂的是旧代理键，后来开了新链，孤儿检查会不会误报？装载该用当前行还是 as-of？</h4>
+            <div class="followup-answer"><p>孤儿检查必须按代理键存在性，不要按「业务键是否等于当前行」。旧 sk 仍在维表（只是 <code>is_current=0</code>），参照完整性通过，这不是孤儿。误报常见于检查写成 <code>JOIN dim ON biz_key AND is_current=1</code>，把历史 sk 判死。当天增量装载：对「事件发生时」as-of 查找当时有效的维版本（<code>start_dt &lt;= event_dt &lt; end_dt</code>）；对迟到补键，也用事实事件日 as-of，不要一律挂最新当前行。拉链/SCD 那题的半开闭约定在这里同样有效。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>INNER JOIN 维表，孤儿订单从 GMV 消失还当对账通过</li><li>没有未知成员，代理键 NULL，GROUP BY 类目时金额进了无名桶或被引擎丢掉</li><li>用业务键直接 JOIN 维表当前行，SCD2 一开新链就把历史订单改挂到今天属性</li><li>把孤儿当脏数据 DELETE，其实是维抽取延迟，钱被删了补不回来</li><li>参照完整性只 COUNT 对不上的行，不留 order_id/sku_id 样本，无法补维</li><li>维表物理删除下架商品，历史事实全部变成孤儿</li><li>迟到回刷用今天的当前维版本，而不是按下单/支付日 as-of</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">事实对不上维先挂未知成员，禁止 INNER JOIN 把钱吞掉；孤儿是质量事故，维到了再按事件日回刷代理键。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

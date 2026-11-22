@@ -478,5 +478,11 @@
     "slug": "metric-gmv-paid-refund-net",
     "title": "GMV 按下单、支付还是成交算？退款怎么冲减，指标说明书怎么写？",
     "category": "指标体系"
+  },
+  {
+    "date": "2026-11-22",
+    "slug": "dq-orphan-unknown-member",
+    "title": "事实表关联维表对不上，你怎么处理？未知成员、孤儿事实、参照完整性怎么做？",
+    "category": "数据质量"
   }
 ]
