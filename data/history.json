@@ -484,5 +484,11 @@
     "slug": "dq-orphan-unknown-member",
     "title": "事实表关联维表对不上，你怎么处理？未知成员、孤儿事实、参照完整性怎么做？",
     "category": "数据质量"
+  },
+  {
+    "date": "2026-11-23",
+    "slug": "spark-cache-persist-checkpoint",
+    "title": "Spark 里 cache、persist 和 checkpoint 有什么区别？什么时候该缓存，什么时候会越缓存越慢？",
+    "category": "大数据计算"
   }
 ]

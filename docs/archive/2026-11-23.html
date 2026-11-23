@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spark 里 cache、persist 和 checkpoint 有什么区别？什么时候该缓存，什么时候会越缓存越慢？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-11-23</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#82</span>
+                    <span class="problem-type tag-bigdata">大数据计算</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">Spark 里 cache、persist 和 checkpoint 有什么区别？什么时候该缓存，什么时候会越缓存越慢？</h1>
+                <div class="topic-row"><span class="topic-chip">Spark</span><span class="topic-chip">cache</span><span class="topic-chip">persist</span><span class="topic-chip">checkpoint</span><span class="topic-chip">血缘</span><span class="topic-chip">StorageLevel</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察候选人会不会把缓存当成「加一句 cache 就变快」。要能分清 persist 保血缘、checkpoint 砍血缘，说清必须有 Action 才物化、StorageLevel 怎么选、一次性 ETL 不要缓存。把 cache 当 persist 落可靠存储、或把原始大表全塞进内存把 execution 挤爆，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先定性：缓存解决的是「贵计算被后续多次用到」，不是让单次扫描自动变快。</li><li>cache 是 persist 的默认档；要报 StorageLevel（内存/磁盘/序列化/副本），RDD 和 DataFrame 默认不一样。</li><li>persist 保留血缘，丢了能重算；checkpoint 截断血缘、落到可靠存储，失败不能靠血缘重放。</li><li>必须跟 Action 才能物化；用完 unpersist；别缓存一次性流水线和原始大表。</li><li>收口：缓存 Shuffle 之后的复用结果；和 AQE、动态分配抢的是同一块 executor 内存。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：cache/persist 是「把这份计算结果留在 executor 上，下次别从血缘重算」；checkpoint 是「把结果写到可靠存储并砍掉血缘」。该不该缓存，先问后面有几次 Action、这份数据算起来有多贵，而不是先加 <code>.cache()</code>。</p>
+<p><strong>先把会错的直觉说死。</strong> 一条 ETL：读表 → 过滤 → join → 写分区，全程只有一次 write，cache 几乎没收益，还多占 storage 内存、多一次物化。缓存赚的是第二次及以后。作业里 <code>df.count()</code> 再 <code>df.write()</code>，中间没有 persist，两次都从源头重算——这才是 cache 的主场。</p>
+<p><strong>cache 和 persist。</strong> <code>cache()</code> 就是 <code>persist()</code> 带默认 StorageLevel，不是另一种机制。<br>- RDD：<code>rdd.cache()</code> = <code>MEMORY_ONLY</code>，内存放不下的分区直接丢掉，下次用再算。<br>- DataFrame / Dataset（Spark 2+）：<code>df.cache()</code> = <code>MEMORY_AND_DISK</code>，内存不够的分区溢写本地盘，避免「缓存了却反复重算」。<br>要自己选档，用 persist：</p>
+<pre><code>from pyspark import StorageLevel
+
+user_gmv = (
+    spark.table("dwd_pay")
+    .where("dt = '2026-11-22'")
+    .groupBy("user_id")
+    .agg(F.sum("pay_amt").alias("gmv"))
+)
+user_gmv.persist(StorageLevel.MEMORY_AND_DISK)
+user_gmv.count()   # 必须有 Action，这一下才真正写入缓存
+
+# 后面多次用：对账、TopN、再 join 维表……
+user_gmv.createOrReplaceTempView("user_gmv")
+spark.sql("SELECT COUNT(*) FROM user_gmv WHERE gmv &gt; 0")
+user_gmv.orderBy(F.desc("gmv")).limit(100).show()
+
+user_gmv.unpersist()  # 用完释放，别占着 storage 坑 execution</code></pre>
+<p>StorageLevel 口述四轴：放内存还是磁盘、是否序列化、几副本。<code>MEMORY_ONLY</code> 最快但不安全；<code>MEMORY_AND_DISK</code> 是 DataFrame 默认、生产最常用；<code>MEMORY_ONLY_SER</code> 省堆但 CPU 换压缩；<code>DISK_ONLY</code> 几乎只在内存极度紧、计算极贵时用。带 <code>_2</code> 的副本是 executor 挂了另一份还在，代价是双倍空间，很少当默认。</p>
+<p><strong>persist 和 checkpoint 差在血缘。</strong> persist 之后血缘还在：某个分区丢了（executor 被动态分配回收、节点挂了、MEMORY_ONLY 放不下被踢），Spark 从父 RDD 重算那个分区。长血缘加宽依赖时，重算可能把整个 Shuffle 链重放一遍，这就是「缓存了还突然极慢」的一种。checkpoint 把当前数据写到可靠存储（HDFS / 对象存储），然后截断血缘：后面的 RDD 只认 checkpoint 文件，不再认祖先。失败了读文件，不重跑那条昂贵的图。</p>
+<pre><code>spark.sparkContext.setCheckpointDir("hdfs:///tmp/spark-ckpt")
+# 或 structured 作业里另有流式 checkpoint，不要混为一谈
+long_lineage_df.checkpoint()   # 可靠检查点，会触发一次 job 去写
+# long_lineage_df.localCheckpoint()  # 只写本地盘，快，但节点丢了就没了</code></pre>
+<p>可靠 checkpoint 本身是一次 Shuffle/写入，贵；所以只在「迭代算法、超长血缘、必须砍断」时用。它不是 persist 的升级档，是另一件事。</p>
+<p><strong>必须物化。</strong> persist/cache 是懒的，跟 transformation 一样。没有 count、write、take 这类 Action，Storage 页是空的，下一个 Action 仍全量算。面试加分：物化完去 Spark UI 的 Storage 看 Cached Partitions、Memory / Disk Used，Fraction Cached 不是 100% 就要问是不是 MEMORY_ONLY 丢分区、还是没跑完。</p>
+<p><strong>什么时候该缓存。</strong><br>1. Shuffle 之后的结果被 2 个以上 Action 或 2 个下游分支用到（聚合完既要写 ADS 又要对账又要抽样）。<br>2. 迭代（PageRank、ALS、多次 round 的图计算）每一轮碰同一份图。<br>3. 小到中等、造起来很贵的查找表，后面要多次 join。</p>
+<p><strong>什么时候不该、会越缓存越慢。</strong><br>- 一次性 ETL，写完就扔。<br>- 缓存原始 ODS / 未过滤明细，storage 把 execution 内存挤掉，Shuffle 开始狂 spill，比不缓存更慢。<br>- 缓存带倾斜的大分区，单个 executor 被打满，看起来「我 cache 了」其实在 GC。<br>- 动态分配开着却不 unpersist，executor 因缓存数据被钉住，集群扩不回去。<br>- 和 AQE 抢内存：cached 数据占 unified memory 的 storage 区，execution 不够就 spill。缓存的该是缩小后的复用集，不是全表。</p>
+<p><strong>别和相邻概念混。</strong> Structured Streaming 的 checkpoint 存的是 offset 和 WAL，保证 exactly-once 语义，不是给 DataFrame 砍血缘。Iceberg/Hudi 的 snapshot 是表格式版本，不是 Spark RDD checkpoint。Driver 上 <code>collect</code> 再当本地 cache，那是把分布式结果塞进 Driver，OOM 责任在 Driver，不叫 persist。</p>
+<p>收尾：面试官要听的是「复用才 cache → persist 保血缘、checkpoint 砍血缘 → Action 物化、用完 unpersist → 缓存 Shuffle 后的小结果，不缓存一次性大表」。能主动说 DataFrame.cache 默认 MEMORY_AND_DISK、UI Storage 验收，这题就过了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">cache</span><span class="keyword-chip">persist</span><span class="keyword-chip">checkpoint</span><span class="keyword-chip">StorageLevel</span><span class="keyword-chip">血缘</span><span class="keyword-chip">unpersist</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：RDD.cache() 和 DataFrame.cache() 默认 StorageLevel 为什么不一样？MEMORY_ONLY 放不下的分区去哪了？</h4>
+            <div class="followup-answer"><p>历史包袱加对象大小。RDD 默认 MEMORY_ONLY：分区是 Java 对象，放不下就丢，血缘还在，下次用再算——老 API 假设你知道自己在干什么。DataFrame 默认 MEMORY_AND_DISK：列存/Tungsten 二进制更紧，溢写磁盘也划得来，避免「以为缓存了其实部分分区每次重算」。MEMORY_ONLY 放不下 = 该分区不在缓存里，不是溢写；UI 上 Fraction Cached &lt; 100% 就是这个。生产 DataFrame 几乎不要改回 MEMORY_ONLY；内存紧用 MEMORY_AND_DISK 或 SER，而不是赌丢分区。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：什么时候必须 checkpoint 而不能只 persist？localCheckpoint 能替代 HDFS checkpoint 吗？</h4>
+            <div class="followup-answer"><p>血缘很长、中间有多次宽依赖，某个分区丢失会把整条 Shuffle 链重放时，persist 的「丢了再算」会比从头写盘更贵，这时 checkpoint。迭代 ML / 图计算每 N 轮砍一次，是教科书场景。流式作业的 checkpointDir 是进度，不是这题的 RDD checkpoint，别混答。localCheckpoint 写 executor 本地盘、截断血缘但不可靠：节点没了，数据没了，只能再从更早的可靠点恢复。开发试迭代可以，生产容错仍要可靠目录。checkpoint 会触发 job，要算进 SLA，不要每一步都 ckpt。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：缓存之后作业更慢或 executor 被钉死，你怎么查？和动态分配、AQE 怎么共处？</h4>
+            <div class="followup-answer"><p>先看 UI：Storage 是否真的 Cached、每个 executor 的 Memory Used；Executor 页是否长时间 Full GC；Shuffle Spill 是否在 cache 之后变大——那是 storage 挤了 execution。动态分配：有缓存数据的 executor 不会被回收，表现为「作业结束了集群还不缩」。处理是尽早 unpersist，或 <code>spark.dynamicAllocation.cachedExecutorIdleTimeout</code> 给一个可接受的钉住时间，而不是关动态分配。AQE 合并分区不负责给你腾缓存；缓存粒度仍是你 persist 的那张表的分区。对策：只 persist 缩小后的聚合/过滤结果，大明细用完即扔，Storage 和 spill 一起看，不要只看作业绿。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>persist/cache 之后没有 Action，以为已经进内存，下一个 count 仍从源头全算</li><li>一次性 ETL 全链路 cache，多占内存还多一次物化，比不缓存慢</li><li>把原始大表 MEMORY_ONLY 塞满，分区被丢或把 execution 挤去 spill</li><li>把 persist 当成可靠落盘，executor 被回收后还以为数据在</li><li>checkpoint 没 setCheckpointDir，或把流式 offset checkpoint 和 RDD checkpoint 混成一件事</li><li>用完不 unpersist，动态分配缩不回去，集群被缓存钉死</li><li>在 Driver 上 collect 当缓存，把分布式问题变成 Driver OOM</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">缓存解决的是贵计算被用多次：persist 留血缘，checkpoint 砍血缘；没有 Action 就没有缓存，一次性大表不要 cache。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
