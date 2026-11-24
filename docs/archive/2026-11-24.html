@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户之间会互相影响时，按人随机的 A/B 还准吗？SUTVA 和溢出效应你会怎么处理？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-11-24</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#83</span>
+                    <span class="problem-type tag-ab">A/B实验</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">用户之间会互相影响时，按人随机的 A/B 还准吗？SUTVA 和溢出效应你会怎么处理？</h1>
+                <div class="topic-row"><span class="topic-chip">SUTVA</span><span class="topic-chip">溢出效应</span><span class="topic-chip">网络干扰</span><span class="topic-chip">随机化单元</span><span class="topic-chip">switchback</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察候选人会不会默认「用户互相独立」。要讲清 SUTVA、直接效应 vs 溢出、估偏方向，以及把随机化单元切到干扰边外面（群/店/城/时间片）。只会说「要随机」却说不清社交、推荐、双边市场为什么按人 AB 会估偏，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先定义 SUTVA：一个人的结果只取决于自己的处理，不受别人进哪一组影响。</li><li>画干扰边：社交传播、共享库存/供给、推荐模型互相训练、同设备/同地理。</li><li>估偏方向：对照被正向污染会低估；对照被抢走资源可能高估或反号。</li><li>改设计：加大随机化单元、切断传播、cluster / ego-cluster / switchback / 双边分层。</li><li>收口：分析单元跟着随机化单元走，用聚类标准误；不要事后扔掉「被影响到的对照」再估。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：按人随机的 ATE 默认假设「别人进哪一组，不影响你的指标」。这个假设叫 SUTVA。社交、推荐、外卖、广告竞价里它经常不成立，这时你估到的不是「这个策略对单个人的效果」，而是「混进了溢出的一团数」。</p>
+<p><strong>SUTVA 在说什么。</strong> Stable Unit Treatment Value Assumption：潜在结果 Y_i(z) 只依赖自己的处理 z_i，不依赖别人的处理向量。拆成两句面试官爱听的：① 没有隐藏版本（同一组里处理是同一个，没有「名义进组、实际没打上」）；② 没有干扰（你的好友、同一商圈的骑手、同一模型的训练样本进了另一组，不改变你的 Y）。① 是工程实现，SRM 和曝光日志能抓；② 是产品结构，按人哈希抓不住。</p>
+<p><strong>干扰从哪来，先画边再谈数。</strong><br>1. <strong>社交 / 内容传播。</strong> 实验组把新分享链路发给对照好友，对照的打开、留存被带起来。你估的是「处理 + 溢出」，对照不再是从未暴露的世界。<br>2. <strong>双边市场 / 共享约束。</strong> 外卖把更好的调度给实验组骑手，对照单更慢；电商实验组用补贴把爆品库存买走，对照转化掉下去。对照被伤害时，组间差会被<strong>放大</strong>，看起来策略神了，全量后供给约束回来，效果腰斩。<br>3. <strong>推荐 / 广告模型。</strong> 实验组行为写进共享特征或当日更新的模型，对照用户也被这套权重打分；或者探索流量只在实验组，模型被带偏。这是「训练污染」，不是用户之间点对点传。<br>4. <strong>同设备、同家庭、同地理。</strong> 按 uid 随机，同一手机两个账号、同一 Wi-Fi 下的家庭、同一商圈的门店，处理会串门。</p>
+<p><strong>估偏怎么开口。</strong> 记直接效应是「只有我被处理」时的变化，溢出是「邻居被处理」时对我的变化。<br>- 对照被<strong>同向污染</strong>（分享、网络正外部性）：组间差变小，<strong>低估</strong>，容易误杀好策略。<br>- 对照被<strong>抢走资源</strong>（库存、运力、曝光位）：组间差变大，<strong>高估</strong>，全量后没有可抢的对照，效果回落。<br>- 两边互相训练成同一模型：两组越跑越像，差被抹平。<br>面试不要只说「有干扰就不准」，要说清方向：低估还是高估，全量后会不会回落。</p>
+<p><strong>设计：把随机化单元切到干扰边外面。</strong><br>1. <strong>Cluster 随机。</strong> 边在群里，就按群/家庭/店铺/商圈/城市哈希，组内处理一致。社交按连通分量或二度好友切；外卖按运力池或网格；本地生活按城市。代价：有效样本变成 cluster 数，方差涨，MDE 按 cluster 算，不是按人数。<br>2. <strong>Ego-cluster / 一跳切分。</strong> 以用户为中心，把他和一跳邻居绑成一团再随机，减少「我在实验、好友在对照」的边。团会重叠，要处理一人多团，工程重。<br>3. <strong>切断通道。</strong> 实验期内关跨组分享、关跨组推荐、特征存储按组隔离、模型按组训练。能切断就不必上巨型 cluster，这是最干净的。<br>4. <strong>Switchback（时间片）。</strong> 干扰在空间上拆不开（全城运力、全站排序），就按时间片整市场切 A/B/A/B，片要长过效应半衰期，片与片之间留缓冲，分析用 cluster-in-time 或 HAC 标准误。适合运力调度、动态定价，不适合有长残留的权益实验。<br>5. <strong>双边分层。</strong> 市场两边都有主体：只随机买家、卖家自适应，溢出在供给侧。可以买家一层、卖家一层，或一边固定一边实验，并报「供给约束是否打满」。</p>
+<p>口述例子：社区产品改「邀请有奖」。按 uid 50/50，实验组把链接发给对照好友，对照注册率被带起，邀请率组间只有 +1% 且不显著——这是正向溢出导致的低估。改成按家族群 cluster 随机，或实验期禁止跨组核销邀请，直接效应才露出来。另一面：即时配送把接单半径实验给一半骑手，对照骑手单变差、超时率升高，组间超时差被放大；全量后全城都是新半径，对照那种「被抢走的单」消失，线上超时改善只有实验里的一半。这就是共享运力的高估。</p>
+<p><strong>分析纪律。</strong> 随机化单元是 cluster，标准误就必须 cluster-robust，或先按 cluster 聚合再检验；仍按用户当独立样本会假显著。ITT 仍按分配的 cluster 算，不要事后把「有实验组好友的对照」删掉再比——那是按碰撞筛选样本，选择偏差比干扰更脏。能测溢出时另报：对照里「邻近实验组」vs「远离实验组」的差，这是溢出的描述，不是拿它当干净 ATE。</p>
+<p>收尾：面试官要听的是「SUTVA = 别人的处理不进我的 Y → 先画干扰边 → 污染对照会低估、抢资源会高估 → 单元切到边外，或切断通道，或时间片 switchback」。能主动说全量后高估会回落、分析单元跟着随机化单元走，这题就过了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">SUTVA</span><span class="keyword-chip">溢出效应</span><span class="keyword-chip">干扰</span><span class="keyword-chip">随机化单元</span><span class="keyword-chip">switchback</span><span class="keyword-chip">聚类标准误</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：Cluster 随机、按城市实验和 switchback 怎么选？有效样本怎么算？</h4>
+            <div class="followup-answer"><p>先看干扰边在空间还是时间、能不能切断。边在小团里（群、店铺）→ cluster，有效 n ≈ cluster 数，组内相关高时一个人几乎不加信息，样本量公式用 cluster 版。边覆盖整座城但城之间还独立（本地生活、运力网格）→ 以城为单元，城太少就不够功效。边是全站共享（统一定价、全局排序、全城运力打满）→ 空间切不开，用时间片 switchback：片长 ≥ 效应半衰期，片间留缓冲防残留，分析把一个「城×时间片」当 cluster。能切断传播（按组隔离模型、禁止跨组券）优先切断，比上巨型 cluster 便宜。城市实验还有季节和城际不可比，要配对或分层；switchback 怕长残留和星期几结构，片要覆盖完整周或做日周期对齐。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：推荐系统里，实验组行为写入共享模型和特征，算不算干扰？怎么隔离？</h4>
+            <div class="followup-answer"><p>算，而且是生产里最常见的一种。对照用户没改产品，但打分函数已经被实验组数据更新，两组越跑越像，效应被稀释；也可能实验组探索把模型带歪，对照一起变差，组间差又被放大。隔离三层：① 特征：用户/物品特征按实验组存两份，或打实验前快照，禁止用实验期行为更新对照特征；② 模型：训练样本按组切，或对照冻结旧模型、实验组用新模型，不要混在一个每日训练任务里；③ 候选集：召回池不要让实验组产出的内容独占，再拿去服务对照。分析仍按用户 ITT，但要在设计里写「模型是否共享」。共享模型的实验结论不能直接外推到「全量后只有一套模型」的世界，需要全量前做一次持有对照的 holdout 集群。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：已经按人随机跑完了，事后发现干扰很大，还能救这个实验吗？</h4>
+            <div class="followup-answer"><p>不能靠加权把它变成无干扰的 ATE。可以做的是描述：画网络后，把对照拆成「几乎无实验组邻居」和「邻居很多」，看后者指标是否被带偏，这是溢出存在的证据，不是干净效应。若几乎无邻居的对照还够量，可当近似无溢出的对照，但要承认这是选择样本（孤立用户 ≠ 总体）。生产决策：干扰大就当估偏，结论标「存在溢出、不可当单人 ATE」；要上线数字，重开——换 cluster / 切断通道 / switchback。不要删掉被影响到的人再做 t 检验，那和触发偏倚是同一类错。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>默认用户独立，社交/运力/共享模型场景仍按 uid 随机并按用户当独立样本报显著</li><li>对照被正向污染时把「不显著」当成策略无效，全量后才发现被低估</li><li>共享库存/运力下把被放大的组间差直接全量，上线后效果回落</li><li>事后扔掉「有实验组好友的对照」再估效，把干扰换成选择偏差</li><li>随机化单元是店铺/城市，分析仍用用户级普通标准误，假显著</li><li>把 switchback 用在有长残留的权益/价格记忆上，片与片互相污染</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">别人进哪一组会改变你的结果时，按人随机估到的已不是单人效应；先画干扰边，再把随机化单元切到边外面。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

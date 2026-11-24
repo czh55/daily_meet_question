@@ -490,5 +490,11 @@
     "slug": "spark-cache-persist-checkpoint",
     "title": "Spark 里 cache、persist 和 checkpoint 有什么区别？什么时候该缓存，什么时候会越缓存越慢？",
     "category": "大数据计算"
+  },
+  {
+    "date": "2026-11-24",
+    "slug": "ab-sutva-interference-spillover",
+    "title": "用户之间会互相影响时，按人随机的 A/B 还准吗？SUTVA 和溢出效应你会怎么处理？",
+    "category": "A/B实验"
   }
 ]
