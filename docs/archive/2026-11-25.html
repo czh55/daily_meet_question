@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>没有 A/B 时，怎么评估一次大促或运营活动的增量效果？前后对比为什么会骗人？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-11-25</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#84</span>
+                    <span class="problem-type tag-biz">业务分析</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">没有 A/B 时，怎么评估一次大促或运营活动的增量效果？前后对比为什么会骗人？</h1>
+                <div class="topic-row"><span class="topic-chip">增量效果</span><span class="topic-chip">反事实</span><span class="topic-chip">DID</span><span class="topic-chip">选择偏差</span><span class="topic-chip">需求透支</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察候选人会不会把「活动周比上周高」当成活动效果。要讲清增量=事实−反事实、前后差混进趋势季节和同期动作、以及没有随机时怎么构造对照（未开放城市 DID、合成对照、预注册未中）。只会说「环比看看」、把参与用户 vs 未参与当对照、或只报活动周 GMV 不看透支，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先定义增量：要的是相对「假如没办这场活动」的差，不是相对上周、也不是相对去年。</li><li>拆开朴素前后差：里面叠了趋势、季节/日历、同期投放与库存、以及谁选择来参与。</li><li>找对照：未触达、未开放城市、预注册未中、合成对照；说清识别假设。</li><li>识别纪律：平行趋势、无溢出、无预期；处理组按「被分配/被覆盖」而不是「实际核销」。</li><li>收口：点估计 + 假设 + 护栏（透支、渠道挤出、售后）；没有对照就只报描述，不说增量。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：活动增量是「办了」相对「假如没办」的差，缺的那一截叫反事实。上周、去年、没参与的人，都不是自动的反事实。没有随机实验时，评估的全部工作就是：把反事实造得尽量像，并讲清哪条假设一破估偏会往哪边走。</p>
+<p><strong>为什么前后对比会骗人。</strong> 记活动期指标为 Y_1，活动前窗口为 Y_0。Y_1 − Y_0 里至少叠了四样东西：① 本来就在涨或跌的趋势；② 星期几、发薪日、年货节、天气；③ 同期别的动作（品牌广告、竞对降价、库存补货、推荐改版）；④ 活动本身。你把 ①②③ 全记在这场大促头上，增量就被污染。同比 Y_今年活动 − Y_去年活动 同样脏：去年力度、流量结构、供给约束都变了，减出来的是「两年活动周之差」，不是今年这场的增量。</p>
+<p><strong>更脏的一种对照：参与 vs 未参与。</strong> 来核销的人更活跃、更价格敏感、本来就会买。拿他们和没领券的人比，组间差里一大块是选择，不是券。这和实验里的触发偏倚是同一类错：处理组被定义成「实际吃到处理的人」，对照是「自己没来的人」。</p>
+<p><strong>正确开口：增量 = Y(办了) − Y(没办)。</strong> 你永远看不到同一个人的 Y(没办)。能做的是找一群「没被这套活动覆盖、但本来会跟处理组走同一条趋势」的人/城/天，用他们的变化去代理反事实。</p>
+<p><strong>没有 A/B 时，对照从哪来（按干净程度）。</strong><br>1. <strong>地理/门店开关 + DID。</strong> 活动只在部分城市或门店上，其余当对照。双重差分：</p>
+<pre><code>lift ≈ (Y_处理,后 − Y_处理,前) − (Y_对照,后 − Y_对照,前)</code></pre>
+<p>第一项是处理组自己的前后差，第二项用对照的前后差把共同趋势减掉。识别假设是<strong>平行趋势</strong>：假如不上活动，两组的变化会一样。活动前多画几期，趋势平行才敢用；只看活动前一周对齐不够。<br>2. <strong>合成对照。</strong> 没有干净的单城对照时，用若干未开放城市的加权组合去拟合处理组活动前的曲线，再用这个合成序列外推活动期。权重要在活动前锁死，不能拿活动期拟合优度去调。适合「全国大促但有少数未上线城/渠道」。<br>3. <strong>预注册 / 资格未中。</strong> 有报名或资格门槛时，未中签、候补、刚好卡在门槛外的人，比「完全没听说」更像处理组。断点附近（门槛左右一小段）比全样本匹配干净。<br>4. <strong>时间序列 / 预测反事实。</strong> 全国同时上、一个对照都没有时，用活动前的季节模型预测活动期，残差当「异常」。这是最弱的：任何同期冲击都会进残差。只能当描述和报警，汇报时要写「这是相对模型预测的偏离，不是因果增量」。</p>
+<p>口述例子：周末满减，大盘 GMV 比上周 +18%。拆开：这周本来就有发薪日和一次品牌投放，对照城市（没满减、投放预算相当）同期 +11%。DID 剩 +7pp，这才接近满减增量。再把窗口拉到活动结束后 7 天，处理城比对照城低了 3pp——有一部分是把下周需求提前了。业务会上你要两行都报：活动周 +7pp，含前后 14 天净增量只有 +4pp。只报 +18% 是在邀功，不是评估。</p>
+<p><strong>三条识别纪律，说不清就不要报因果。</strong><br>1. <strong>平行趋势。</strong> 活动前处理/对照的差分应当平稳。不平就分层（城市等级、新老）或换合成对照，不要硬 DID。<br>2. <strong>无溢出。</strong> 对照城用户别被全国广告、社交传播带起来；供给别从对照城调去处理城。溢出一旦发生，对照被污染，DID <strong>低估</strong>（和 SUTVA 那题同一方向）。<br>3. <strong>无预期 / 无提前抢跑。</strong> 预热期已经把货垫进购物车，活动「开始日」切晚了，增量会被切到窗外或看起来更冲。处理组按覆盖名单（城、渠道、资格）做 ITT，不要事后改成「核销用户」。</p>
+<p><strong>护栏：透支、挤出、售后。</strong> 大促常把下个月的单提前，也常把自然流量挤进活动渠道（last-click 看起来活动很猛，增量其实是归因搬家）。评估窗口至少覆盖：活动前基线、活动期、活动后回落期。净增量 ≈ 活动期超额 − 前后窗口的透支。同时看退款、客诉、毛利，GMV 增量可以是亏钱换来的。</p>
+<p>收尾：面试官要听的是「增量相对反事实 → 前后差和参与 vs 未参与都不是反事实 → DID/合成对照/资格未中，并报平行趋势、溢出、透支」。能主动说没有对照就只描述不说增量，这题就过了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">反事实</span><span class="keyword-chip">增量</span><span class="keyword-chip">DID</span><span class="keyword-chip">平行趋势</span><span class="keyword-chip">合成对照</span><span class="keyword-chip">需求透支</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：DID 的平行趋势怎么检查？不平的时候还能报吗？</h4>
+            <div class="followup-answer"><p>活动前至少画 4～8 个同长度的期，看处理−对照的差分是否在 0 附近晃、有没有已经分开的斜坡。能量化就做活动前假处理：把开始日往前挪，估计应接近 0。不平先问是水平不同还是斜率不同：水平不同 DID 仍可用（差分会消掉），斜率不同则反事实会继续分叉，估偏。处理：按城市等级/新老分层各自 DID；或改合成对照去拟合活动前曲线；或加入活动前趋势协变量。不平还硬报，要在结论里写成「假设不成立时的敏感区间」，不能只给一个点估计。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：全国同时上线、一个对照城市都没有，还能评估吗？</h4>
+            <div class="followup-answer"><p>因果增量变得很弱，不要装成实验。还能做的三档：① 若有预注册/会员档/渠道白名单，用未覆盖人群或门槛外用户当对照，声明选择仍然在；② 用活动前季节模型做预测反事实，残差当异常，明确这是「相对预测的偏离」；③ 看活动后回落：若活动后相对活动前明显更低，至少能描述透支，不能把活动周毛增量当净增量。全国大促更应在设计阶段留 holdout：一个渠道、一个城市集群、或一小撮用户不进活动，评估才有落点。已经全上了，就只报描述 + 假设，决策用「值不值得再办」的区间，不要用一个精确 ROI 去结案。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：活动把下个月需求提前了，GMV 增量怎么报才不骗业务？</h4>
+            <div class="followup-answer"><p>把窗口写成三段：基线、活动期、活动后（至少覆盖一个完整购买周期，电商常用活动后 7～14 天，耐用商品更长）。净增量 = 活动期相对对照的超额 − 活动后相对对照的亏损（透支） − 若有预热抢跑再减预热超额。渠道挤出另报一行：活动渠道 GMV 起来、自然渠道掉下去，last-click 会把搬家算进活动。会上三行：活动周毛增量、净增量（含前后）、毛利/退款护栏。业务只想听「+18%」时，你要主动把净增量和护栏放在同一页，否则评估在帮运营申预算，不是在量效果。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>把活动周减上周、或今年活动周减去年活动周，直接叫增量</li><li>用实际核销/参与用户 vs 未参与用户当对照，把选择偏差当成券效</li><li>DID 不查平行趋势，或对照城已被全国广告和调拨运力污染仍当干净对照</li><li>只报活动周 GMV，不看活动后回落和渠道挤出，把透支和归因搬家当增长</li><li>全国同时上线还报精确 ROI，把时间序列残差说成因果</li><li>处理组事后改成「核销成功用户」，把 ITT 变成触发偏倚</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">增量是相对「假如没办」不是相对上周；前后差只是描述，没有对照就没有因果增量。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>

@@ -496,5 +496,11 @@
     "slug": "ab-sutva-interference-spillover",
     "title": "用户之间会互相影响时，按人随机的 A/B 还准吗？SUTVA 和溢出效应你会怎么处理？",
     "category": "A/B实验"
+  },
+  {
+    "date": "2026-11-25",
+    "slug": "biz-campaign-lift-did-counterfactual",
+    "title": "没有 A/B 时，怎么评估一次大促或运营活动的增量效果？前后对比为什么会骗人？",
+    "category": "业务分析"
   }
 ]
