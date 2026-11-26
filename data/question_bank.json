@@ -4002,5 +4002,60 @@
       "需求透支"
     ],
     "anchor": "增量是相对「假如没办」不是相对上周；前后差只是描述，没有对照就没有因果增量。"
+  },
+  {
+    "id": 85,
+    "slug": "sql-window-frame-rows-range",
+    "title": "窗口函数的 ROWS 和 RANGE 有什么区别？累计求和、近 7 日均值怎么写？",
+    "category": "SQL",
+    "difficulty": "中等",
+    "topics": [
+      "窗口帧",
+      "ROWS",
+      "RANGE",
+      "累计求和",
+      "移动平均"
+    ],
+    "ready": true,
+    "intent": "考察候选人会不会把窗口函数停在 PARTITION / ORDER：真正决定「当前行看见哪一段」的是帧（frame）。要能讲清默认 RANGE 吃到当前排序值、ROWS 按物理行计数、以及近 7 日均值碰到缺日期为什么会变成近 7 行。只会写 SUM() OVER(PARTITION BY … ORDER BY dt) 却说不清默认帧、把 RANGE 当 ROWS、移动窗口不补日历，这题就浅了。",
+    "framework": [
+      "拆三件套：PARTITION 切组、ORDER 定序、FRAME 定当前行的可见区间。",
+      "点破默认：有 ORDER BY 时默认 RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW，按排序键的值，不是按物理行。",
+      "对照 ROWS / RANGE：ROWS 数 N 行；RANGE 吃进排序键相等的同伴，也可按值偏移。",
+      "业务三件套：开窗累计、近 N 行、近 N 个日历日；缺日期必须先补日历再窗口。",
+      "收口：组首不足 N 行会缩窗、排除当前行、引擎对 RANGE 日期偏移的方言差。"
+    ],
+    "answer": "一句话：窗口函数不是「分组后再排序」，是「每一行戴一个望远镜」。PARTITION 决定和谁一队，ORDER 决定朝哪看，FRAME 决定望远镜有多长。很多人只写前两段，帧用了默认还不知道。\n\n**默认帧会咬人。** 你写：\n```sql\nSUM(gmv) OVER (\n  PARTITION BY user_id\n  ORDER BY dt\n) AS running_gmv\n```\n看起来像累计，SQL 标准的默认其实是：\n```sql\nRANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n```\n意思是：从组开头一直加到「排序键 ≤ 当前行排序键」的所有行。同一天两笔订单、ORDER BY 只写 dt 时，这两行排序键相等，RANGE 会把这一天的两行都算进彼此——「当天第一笔的累计」已经含了当天第二笔。报表要按发生顺序逐行累加，必须改成 ROWS，并且 ORDER BY 加上稳定键。\n\n口述对照：\n```sql\n-- 按行累计：当前行只看到自己和前面的行\nSUM(gmv) OVER (\n  PARTITION BY user_id\n  ORDER BY dt, order_id\n  ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n) AS running_gmv\n\n-- 按日累计：同一天所有订单共享「截至当天」的合计\nSUM(gmv) OVER (\n  PARTITION BY user_id\n  ORDER BY dt\n  RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n) AS gmv_to_date\n```\nRANGE 的 CURRENT ROW 是「当前排序值」，不是「当前这一行」。同一排序值的行叫同伴（peer）。要按行，就 ROWS + 稳定键；要按日汇总，才用 RANGE，或先按日 GROUP BY 再开窗。\n\n**ROWS vs RANGE 一张表。**\n- `ROWS BETWEEN 6 PRECEDING AND CURRENT ROW`：物理上往前数 6 行，加上自己共 7 行。近 7 行，不是近 7 日。中间缺一天，会跨到 8 天以前。\n- `RANGE BETWEEN INTERVAL '6' DAY PRECEDING AND CURRENT ROW`：按排序键的值差，吃进键值落在窗口里的所有行。dt 是日期时，这才是含当天的 7 个日历日。同一天多行会全部进来。\n- 没有 ORDER BY 时，很多引擎默认整分区 `UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING`，窗口 SUM 等于组内合计，和 GROUP BY 的结果一样——这就是「窗口 vs GROUP BY」那题的交界。\n\n**近 7 日均值：先补洞，再开窗。** 用户不是每天都有订单。直接 `AVG(gmv) OVER (… ROWS BETWEEN 6 PRECEDING AND CURRENT ROW)` 是近 7 条有数的记录：活跃用户还好，稀疏用户会把半个月拼成「近 7 日」。正确姿势是人×日补齐，没有下单的 gmv 按口径填 0 或 NULL，再开窗：\n```sql\nSELECT\n  user_id, dt, gmv,\n  AVG(gmv) OVER (\n    PARTITION BY user_id\n    ORDER BY dt\n    ROWS BETWEEN 6 PRECEDING AND CURRENT ROW\n  ) AS avg_7d\nFROM user_day_spine   -- 每天一行，缺日已补\n```\n补齐之后每天一行，ROWS 6 PRECEDING 才等于 7 个日历日。不补洞就用 RANGE 的日期偏移（引擎支持的话），不要假装 ROWS 懂日历。\n\nNULL 口径必须先钉：缺日当 0，均值会被拉低，适合看「活跃被稀释」；缺日当 NULL，AVG 跳过空日，适合看「有成交日的客单」。写进说明书，不要现场拍。\n\n**移动窗口的边界。** 组开头不足 7 行，帧会缩成「从开头到当前」——这是标准行为。只要完整 7 日窗口，外层加 `COUNT(*) OVER (同样的帧) = 7`，或先 `ROW_NUMBER()` 再 `WHERE rn >= 7`。不要用假行去补，除非产品明确要占位。\n\n收尾：面试官要听的是「三件套 → 默认是 RANGE 到当前值 → 按行累计用 ROWS 加稳定键 → 近 N 日先补日历」。能主动说同一天多行 RANGE 会互吃、ROWS 近 7 行不是近 7 日，这题就过了。",
+    "followups": [
+      {
+        "q": "同一天两笔订单、ORDER BY 只写 dt，累计为什么对不上流水账？",
+        "a": "默认 RANGE 把同一 dt 当成同一个 CURRENT ROW，两笔互算进对方。流水账要的是发生顺序，必须 `ORDER BY dt, order_id`（或 event_time）并改成 ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW。如果业务要的是「截至当天的用户累计 GMV」，RANGE 按日反而是对的，两笔共享同一个截至值。先问报表格子是「每一笔后面跟一个累计」还是「每一天一个截至数」，再选帧。对账时用小例子：同一天 10 和 20，ROWS 得到 10、30，RANGE 得到 30、30。"
+      },
+      {
+        "q": "近 7 日和近 7 个有数日差在哪？RANGE 的 INTERVAL 各引擎都支持吗？",
+        "a": "近 7 日是日历窗口，分母含没有成交的日子；近 7 个有数日是事件窗口，稀疏用户会看更长的真实跨度。DAU 类活跃、库存周转用日历窗；「最近 7 笔订单的客单」才用有数日。RANGE INTERVAL 在 PostgreSQL、BigQuery 较完整，Hive / Spark SQL / Presto 对日期 RANGE 支持不一致，有的只允许数值排序键。跨仓最稳的做法是：先用日历表把人×日补齐，再用 ROWS 6 PRECEDING——语义清楚，迁移不看方言。不要在面试里只甩一句「用 RANGE 就行」却说不出引擎差异。"
+      },
+      {
+        "q": "要「相对前一天的环比」或「从当前行看到组尾的剩余合计」，帧怎么写？",
+        "a": "环比本质是当前行和上一行：`LAG(gmv, 1) OVER (PARTITION BY user_id ORDER BY dt)`，或 `gmv / SUM(gmv) OVER (… ROWS BETWEEN 1 PRECEDING AND 1 PRECEDING)`。不要用默认累计帧去做环比。剩余合计是 `SUM(gmv) OVER (PARTITION BY user_id ORDER BY dt ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING)`。只要「别人、不要自己」，写成 `ROWS BETWEEN 1 PRECEDING AND 1 PRECEDING` 或标准里的 EXCLUDE CURRENT ROW（方言少，面试提一句即可，落地仍用 LAG/显式边界更稳）。帧的两端都能动：UNBOUNDED、N PRECEDING/FOLLOWING、CURRENT ROW，先画当前行再填两端。"
+      }
+    ],
+    "pitfalls": [
+      "只写 ORDER BY 不写帧，默认 RANGE 让同一排序键的行互相计入，逐行累计对不上流水",
+      "用 ROWS BETWEEN 6 PRECEDING 当近 7 日，缺日期时窗口跨出日历，稀疏用户被算成半个月",
+      "ORDER BY 没有稳定键，同一天多行重跑累计顺序漂，对账对不齐",
+      "组首不足 N 行时用 0 补假行，把均值和合计算脏",
+      "没有 ORDER BY 就把窗口 SUM 当累计，其实是整分区合计",
+      "把缺日当 0 还是当 NULL 现场拍，AVG 一个被稀释一个跳过空日，口径对不上"
+    ],
+    "keywords": [
+      "窗口帧",
+      "ROWS",
+      "RANGE",
+      "累计求和",
+      "移动平均",
+      "日历补齐"
+    ],
+    "anchor": "窗口函数的长度由帧决定：默认 RANGE 吃到当前值；按行累计用 ROWS，近 N 日先补日历再开窗。"
   }
 ]

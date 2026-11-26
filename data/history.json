@@ -502,5 +502,11 @@
     "slug": "biz-campaign-lift-did-counterfactual",
     "title": "没有 A/B 时，怎么评估一次大促或运营活动的增量效果？前后对比为什么会骗人？",
     "category": "业务分析"
+  },
+  {
+    "date": "2026-11-26",
+    "slug": "sql-window-frame-rows-range",
+    "title": "窗口函数的 ROWS 和 RANGE 有什么区别？累计求和、近 7 日均值怎么写？",
+    "category": "SQL"
   }
 ]
