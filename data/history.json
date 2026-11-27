@@ -508,5 +508,11 @@
     "slug": "sql-window-frame-rows-range",
     "title": "窗口函数的 ROWS 和 RANGE 有什么区别？累计求和、近 7 日均值怎么写？",
     "category": "SQL"
+  },
+  {
+    "date": "2026-11-27",
+    "slug": "dw-role-playing-dimension",
+    "title": "下单日、支付日、发货日都要关联日期维，数仓要建三张日期表吗？什么是角色扮演维度？",
+    "category": "数仓建模"
   }
 ]

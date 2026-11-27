@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>下单日、支付日、发货日都要关联日期维，数仓要建三张日期表吗？什么是角色扮演维度？ | 每日面试问答</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <span class="logo-icon">&#x25C7;</span>
+            </a>
+            <span class="header-date">2026-11-27</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="problem-card">
+            <header class="problem-header">
+                <div class="problem-meta">
+                    <span class="problem-id">#86</span>
+                    <span class="problem-type tag-dw">数仓建模</span>
+                    <span class="problem-difficulty difficulty-medium">中等</span>
+                </div>
+                <h1 class="problem-title">下单日、支付日、发货日都要关联日期维，数仓要建三张日期表吗？什么是角色扮演维度？</h1>
+                <div class="topic-row"><span class="topic-chip">角色扮演维度</span><span class="topic-chip">日期维</span><span class="topic-chip">一致性维度</span><span class="topic-chip">退化维</span><span class="topic-chip">别名视图</span></div>
+            </header>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F3AF;</span>
+                    考察意图
+                </h2>
+                <div class="problem-description">
+                    <p>考察候选人会不会把「同一张维在一张事实里出现多次」建成多份物理拷贝。要能讲清角色扮演维度：一份物理日期/用户/地点维，事实表挂多个代理键，查询用别名或视图扮演下单日、支付日、发货日。只会说「再建三张日期表」或把所有事件都挤进一个 dt 列，这题就浅了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4D0;</span>
+                    回答框架
+                </h2>
+                <div class="framework-box">
+                    <ol class="answer-framework"><li>先钉场景：一张事实里同一个维出现多次，每次含义不同（下单日 vs 支付日 vs 发货日）。</li><li>给定义：角色扮演维度是同一份物理维、多个角色；事实表为每个角色留一个外键。</li><li>落地：只建一张 dim_date（或 dim_user），用视图/别名扮演；禁止复制三份维表。</li><li>对照：一致性维是跨事实复用；退化维是没属性的业务号直接放事实；都不是多拷贝。</li><li>收口：查询必须按角色分别 JOIN；聚合前声明「按哪一个日期切」；日历属性跟角色走。</li></ol>
+                </div>
+            </section>
+
+            <section class="section highlight-box">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AC;</span>
+                    参考答案（口述版）
+                </h2>
+                <div class="answer-body">
+                    <p>一句话：下单日、支付日、发货日都是「日期」，但角色不同。数仓只建一张日期维，事实表挂三个日期代理键；查询时用三个别名分别扮演。不要复制三张日期表，也不要把三种事件挤进同一个 dt。</p>
+<p><strong>先把会错的两种写法说死。</strong><br>1. <strong>物理拷贝</strong>：<code>dim_date_order</code>、<code>dim_date_pay</code>、<code>dim_date_ship</code> 三份数据。节假日改一处漏两处，财政日历对不齐，存储和维护都是税。<br>2. <strong>单日期列</strong>：事实只留一个 <code>dt</code>，看板有的按下单、有的按支付，看起来都叫「11 月 GMV」，对不上还先怪口径。履约时效更算不了——没有两个日期可减。</p>
+<p><strong>角色扮演维度（role-playing dimension）</strong> 就是：一份物理维，在同一张事实里演多个角色。每个角色一个外键，维表本身不复制。</p>
+<p>日期是教科书例子。<code>dim_date</code> 粒度是一天一行：公历、周几、是否节假、财年财周、大促日标记。订单事实是过程，会碰到多个日期角色：<br>- <code>order_date_sk</code>：下单日（意向）<br>- <code>pay_date_sk</code>：支付日（经营日报最常用）<br>- <code>ship_date_sk</code>：发货日<br>- <code>refund_date_sk</code>：退款发生日（若退款不另建事实）</p>
+<p>表结构口述：</p>
+<pre><code>-- 物理维只有一张，主键是日期代理键
+-- dim_date(date_sk, dt, year, month, week_id, is_holiday, is_promo, fiscal_year)
+
+-- 事实：一行仍是一笔订单，多个日期角色 = 多列外键
+-- fct_order(
+--   order_sk, order_id, user_sk, sku_sk, gmv,
+--   order_date_sk, pay_date_sk, ship_date_sk
+-- )
+
+-- 查询用别名扮演，不要把维复制三份
+SELECT
+  d_pay.dt AS pay_dt,
+  SUM(f.gmv) AS paid_gmv
+FROM fct_order f
+JOIN dim_date d_pay  ON f.pay_date_sk  = d_pay.date_sk
+JOIN dim_date d_ship ON f.ship_date_sk = d_ship.date_sk
+WHERE d_pay.dt BETWEEN DATE '2026-11-01' AND DATE '2026-11-26'
+  AND d_ship.is_holiday = 1          -- 「支付在这周、且发货落在节假日」
+GROUP BY 1;</code></pre>
+<p><code>d_pay</code> 和 <code>d_ship</code> 是同一个物理表的两个角色。节假日属性必须跟「发货日」走，不能拿支付日的 <code>is_holiday</code> 去解释物流。</p>
+<p>引擎落地可以更省事：给每个角色建视图，BI 看起来像三张维。</p>
+<pre><code>CREATE VIEW dim_order_date AS SELECT * FROM dim_date;
+CREATE VIEW dim_pay_date   AS SELECT * FROM dim_date;
+CREATE VIEW dim_ship_date  AS SELECT * FROM dim_date;</code></pre>
+<p>视图零拷贝，元数据上角色名写死，避免分析师 JOIN 错列。Hive / Spark 没有好用的视图时，SQL 里别名就够；不要因此建成三张物理表。</p>
+<p><strong>和相邻概念划界，面试加分。</strong><br>- <strong>一致性维度</strong>：跨事实、跨数据域共用同一套键和口径——支付事实和曝光事实都挂同一张 <code>dim_user</code>。角色扮演是<strong>同一张事实内部</strong>多次挂同一维。两者常叠在一起：<code>dim_date</code> 既是全仓一致性维，又在订单事实上扮演多个日期角色。<br>- <strong>退化维</strong>：订单号几乎没属性，直接放事实表，不建空维。角色扮演的日期维是有丰富属性的真维，只是被多次引用。<br>- <strong>累积快照</strong>：过程一行、多个里程碑时间戳，和角色扮演是一对搭档——累积快照提供多个日期列，角色扮演提供每个日期列怎么挂维。不要把时间戳只当 STRING 存着，看板按角色切不动。<br>- <strong>多个日期事实表</strong>：退款量大、生命周期和订单解耦时，退款应另建事务事实，用自己的 <code>refund_date_sk</code>；不是在订单头上无限加角色。角色多到算不清，说明过程该拆表。</p>
+<p><strong>日期维本身别偷懒。</strong> 角色扮演成立的前提是维表一天一行、代理键稳定、属性够用。至少要有：公历日期、年/月/周、周几、是否周末、法定节假、业务大促日历、财年（如果财务按财年关账）。代理键常用 <code>yyyyMMdd</code> 的 int，查起来人和机器都方便；不要用业务库的 <code>DATE</code> 类型当事实外键还在各作业里 <code>CAST</code>。未发生的节点（没发货）挂未知成员或约定的 <code>date_sk=0</code>，不要 NULL 到让 JOIN 丢行——和孤儿事实那题同一条高压线。</p>
+<p><strong>查询高压线。</strong> 看板标题必须写「按支付日」还是「按下单日」。SQL 里 WHERE 和 GROUP BY 用的必须是同一个角色的别名。混用是经典事故：<code>WHERE d_order.dt = 今天</code> 却 <code>JOIN</code> 的是支付日维，或 GROUP BY 支付月、过滤却下单月。对账时先问「这一列日期是哪个角色」，再比金额。</p>
+<p>其他常见角色，同一套路：<br>- 用户维：买家 vs 卖家 vs 推荐人（平台电商）<br>- 地点维：发货仓 vs 收货地址 vs 下单 IP 城市<br>- 员工维：接单客服 vs 关单客服<br>物理表各一张，事实多外键，查询多别名。买家和卖家若属性差很多（C 端用户 vs 商家），那就不是角色扮演，是两张一致性维——角色扮演的前提是<strong>同一实体类型、同一套属性</strong>。</p>
+<p>收尾：面试官要听的是「一份物理维 + 事实多外键 + 查询按角色别名 JOIN」。能主动说不要拷贝三张日期表、日历属性跟角色走、未发生节点挂未知成员，这题就过了。</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F50D;</span>
+                    关键词
+                </h2>
+                <div class="keyword-row"><span class="keyword-chip">角色扮演维度</span><span class="keyword-chip">日期维</span><span class="keyword-chip">别名</span><span class="keyword-chip">一致性维度</span><span class="keyword-chip">退化维</span><span class="keyword-chip">累积快照</span></div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F4AD;</span>
+                    面试官可能的追问
+                </h2>
+                <div class="followups">
+                    <div class="followup-item">
+            <h4>追问 1：为什么不直接把日期做成三张物理表？视图和别名在 Hive / Spark / BI 里怎么选？</h4>
+            <div class="followup-answer"><p>物理拷贝的成本是属性漂移：节假日、财周、大促日历只改一处必须全改，对账会发现「支付日维的春节」和「发货日维的春节」差一天。存储是其次。视图适合对 BI 暴露角色名（Looker / Tableau 认三张 dim）；Spark/Hive 批作业用 SQL 别名即可，避免视图嵌套让优化器变笨。物化三张只在「引擎不能多次 JOIN 同表」的老系统里当无奈之举，且必须从同一份 dim_date 每日覆盖生成，禁止三套 ETL。面试说「我可以物化加速，但源头仍是一张」才完整。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 2：支付在 11 月、发货在 12 月，GMV 算哪个月？角色扮演和指标说明书怎么配合？</h4>
+            <div class="followup-answer"><p>这不是建模题的歧义，是口径题：经营日报默认按支付日；履约及时率按发货日或承诺日；税务/确认收货 GMV 按成交日。角色扮演把三个日期都留下，让说明书去挑角色，而不是事实表替业务做选择。同一笔 GMV 可以进「11 月支付 GMV」和「12 月发货 GMV」两张看板，标题必须带角色。禁止把事实里的单个 dt 分区既当支付日又当下单日——分区键通常取最常用角色（支付日），其他角色当列，按角色过滤时不要假设分区剪枝等于口径。</p></div>
+        </div>
+<div class="followup-item">
+            <h4>追问 3：买家和卖家都是用户，能不能用角色扮演？和一致性维、桥接表怎么分？</h4>
+            <div class="followup-answer"><p>同一套用户属性（账号、注册渠道、等级）才能角色扮演：事实挂 buyer_sk / seller_sk，JOIN dim_user 两次。C 端买家和 B 端商家属性完全不同（店铺类目、保证金 vs 会员等级），应是两张一致性维 dim_buyer / dim_merchant，不要硬演。一人分饰多角色还要看历史：SCD2 时每个外键应对事件日 as-of 到自己的版本，买家下单时的等级和卖家当时的店铺类目不是同一个 as-of 列能混的。桥接表解决的是多对多（一单多券），不是一单两个角色；两个角色是两个多对一外键，不要做成桥接。</p></div>
+        </div>
+                </div>
+            </section>
+
+            <section class="section pitfalls-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x26A0;&#xFE0F;</span>
+                    常见踩坑
+                </h2>
+                <div class="pitfalls">
+                    <ul class="pitfall-list"><li>为下单/支付/发货复制三张物理日期维，节假日和财年改一处漏两处</li><li>事实只留一个 dt，经营日报、履约、退款各解释各的，三个看板三个月</li><li>JOIN 了支付日维，WHERE/GROUP BY 却用下单日别名，角色混用</li><li>未发货的 ship_date_sk 留 NULL，INNER JOIN 日期维把未发货订单从 GMV 里吞掉</li><li>把买家/卖家这种不同实体类型硬做成角色扮演，属性对不上还假装同一张维</li><li>把角色扮演和一致性维说成一回事：前者是一表多角色，后者是跨事实复用</li><li>日历属性跟错角色：用支付日的 is_holiday 解释物流延误</li></ul>
+                </div>
+            </section>
+
+            <section class="section anchor-section">
+                <h2 class="section-title">
+                    <span class="section-icon">&#x1F9E0;</span>
+                    记忆锚点
+                </h2>
+                <blockquote class="anchor-quote">同一张维演多个角色：物理表只建一份，事实为每个角色留外键，查询用别名 JOIN；日历属性跟角色走，不要拷贝三张日期表。</blockquote>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>每日面试问答 &mdash; 用结构化口述，把「知道名词」练成「答得出深度」</p>
+            <p class="footer-meta">基于 <a href="https://github.com/czh55/daily_meet_question">daily_meet_question</a> · Cursor Automations 自动生成</p>
+        </div>
+    </footer>
+</body>
+</html>
