@@ -514,5 +514,11 @@
     "slug": "dw-role-playing-dimension",
     "title": "下单日、支付日、发货日都要关联日期维，数仓要建三张日期表吗？什么是角色扮演维度？",
     "category": "数仓建模"
+  },
+  {
+    "date": "2026-11-28",
+    "slug": "metric-arpu-outlier-denominator",
+    "title": "人均 GMV 涨了、总 GMV 没涨，算变好吗？人均指标怎么定义、异常用户怎么处理？",
+    "category": "指标体系"
   }
 ]
